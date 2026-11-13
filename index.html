@@ -300,6 +300,19 @@ nav.tabs{background:color-mix(in srgb,var(--surface) 82%,transparent);-webkit-ba
 .ds-body{gap:14px}
 .ds-body .hero{box-shadow:none}
 header.top .count{display:none}
+
+/* TrainingPeaks-style compliance */
+:root{--c-green:#2FA65A;--c-yellow:#E3B505;--c-orange:#F07C1E;--c-red:#D9363E;--c-grey:#A3ADA9}
+.dc-w{align-items:center}
+.dc-w i{background:var(--c-grey)}
+.dc-w.c-green i{background:var(--c-green)} .dc-w.c-yellow i{background:var(--c-yellow)} .dc-w.c-orange i{background:var(--c-orange)} .dc-w.c-red i{background:var(--c-red)}
+.dc-w em{font-style:normal;margin-left:auto;color:var(--muted);font-variant-numeric:tabular-nums;font-size:11.5px;padding-left:4px}
+.dcell.dc-green{border-top-color:var(--c-green)} .dcell.dc-yellow{border-top-color:var(--c-yellow)} .dcell.dc-orange{border-top-color:var(--c-orange)} .dcell.dc-red{border-top-color:var(--c-red)}
+.dcell.done,.dcell.missed{background:var(--surface)}
+.wd.wc-yellow .n{background:var(--c-yellow);color:#1b1500} .wd.wc-orange .n{background:var(--c-orange);color:#fff} .wd.wc-green .n{background:var(--c-green);color:#fff}
+.pill.cp-green{background:var(--good-soft);color:var(--c-green)} .pill.cp-yellow{background:color-mix(in srgb,var(--c-yellow) 20%,var(--surface));color:color-mix(in srgb,var(--c-yellow) 70%,var(--ink))} .pill.cp-orange{background:color-mix(in srgb,var(--c-orange) 18%,var(--surface));color:var(--c-orange)} .pill.cp-red{background:var(--bad-soft);color:var(--c-red)} .pill.cp-grey{background:var(--surface2);color:var(--muted)}
+.fitseg{display:grid;grid-template-columns:repeat(3,1fr)}
+.fitseg button{font-size:12.5px;padding:8px 4px}
 </style>
 </head>
 <body>
@@ -367,7 +380,7 @@ header.top .count{display:none}
       <h2 id="week-h">This week</h2>
       <div class="card wkhead" id="wkhead"></div>
       <div class="tiles" id="week-tiles"></div>
-      <div class="legend"><span><i style="background:var(--good)"></i>Done</span><span><i style="background:var(--muted)"></i>Coming up</span><span><i style="background:var(--bad)"></i>Missed</span><span>Tap a day for details</span></div>
+      <div class="legend"><span><i style="background:var(--c-green)"></i>As planned</span><span><i style="background:var(--c-yellow)"></i>Cut short</span><span><i style="background:var(--c-orange)"></i>More than planned</span><span><i style="background:var(--c-red)"></i>Missed</span><span><i style="background:var(--c-grey)"></i>Coming up</span></div>
       <div class="cal" id="week-list"><p class="empty">Loading the week…</p></div>
     </div>
     <div class="sec">
@@ -384,6 +397,12 @@ header.top .count{display:none}
         <div class="seg" id="range"><button type="button" data-r="12" aria-pressed="true">12 wk</button><button type="button" data-r="26" aria-pressed="false">6 mo</button><button type="button" data-r="999" aria-pressed="false">All</button></div>
       </div>
       <div class="tiles" id="trend-tiles"></div>
+    </div>
+    <div class="sec" id="c-pmc">
+      <h2>Fitness, fatigue and form</h2>
+      <div class="tiles" id="pmc-tiles"></div>
+      <div class="card"><div class="legend"><span><i style="background:var(--bike)"></i>Fitness (6-week load)</span><span><i style="background:var(--test)"></i>Fatigue (7-day load)</span><span><i style="background:var(--gym)"></i>Form = fitness − fatigue</span></div><div class="chart" id="ch-pmc"></div>
+      <div class="explain small muted" style="margin-top:8px"><p>Every session earns training-load points based on how long and how hard it was. <b>Fitness</b> rises slowly as you train consistently; <b>fatigue</b> rises fast after hard days and drops fast with rest. <b>Form</b> below 0 means you are building (tired but getting fitter); 5–25 before a race means fresh and ready.</p></div></div>
     </div>
     <div class="sec" id="c-km">
       <h2>Running km per week</h2>
@@ -476,7 +495,7 @@ window.addEventListener('hashchange',()=>show(location.hash.slice(1)));
 show(location.hash.slice(1));
 
 /* ---------- state ---------- */
-const S={plan:null,weekly:[],summary:null,goals:null,report:null,checkins:{},requests:[]};
+const S={pmc:null,plan:null,weekly:[],summary:null,goals:null,report:null,checkins:{},requests:[]};
 let db=null, canWrite=true;
 
 /* ---------- workouts ---------- */
@@ -498,15 +517,26 @@ async function saveLog(date,wid,patch){
   catch(e){showBanner('Couldn’t save that. Check your connection and try again.')}}
 function rpeScale(onPick,current){const sc=el('div','scale ten');for(let i=1;i<=10;i++){const bt=el('button','',String(i));bt.type='button';bt.setAttribute('aria-label','RPE '+i);bt.setAttribute('aria-pressed',String(current===i));bt.addEventListener('click',()=>onPick(i));sc.append(bt)}
   const wrap=el('div');wrap.append(sc);const ends=el('div','ends');ends.append(el('span','','1 very easy'),el('span','','10 all out'));wrap.append(ends);return wrap}
+const FITSEL={};const FITLBL={plan:'Done as planned',short:'Done, cut short',over:'Done, longer/harder'};
+const COMPLBL={green:'As planned',yellow:'Cut short',orange:'More than planned',red:'Missed',grey:'Coming up'};
+function comp(w,date){const e=eff(w,date);if(e==='missed')return 'red';if(e!=='done')return 'grey';const lg=logOf(date,w.id);
+  if(lg&&lg.fit)return lg.fit==='short'?'yellow':lg.fit==='over'?'orange':'green';
+  if(w.compliance)return w.compliance; if(w.status==='partial')return 'orange'; if(w.status==='swapped')return 'yellow'; return 'green'}
+function dayComp(d){const its=(d.items||[]).filter(w=>w.status!=='optional'||eff(w,d.date)==='done');if(!its.length)return '';
+  const c=its.map(w=>comp(w,d.date));for(const k of ['red','orange','yellow'])if(c.includes(k))return k;if(c.every(x=>x==='green'))return 'green';return 'grey'}
+function fmtHM(m){m=Math.round(m||0);return Math.floor(m/60)+':'+String(m%60).padStart(2,'0')}
 function logNode(w,date){
   const lg=logOf(date,w.id), e=eff(w,date), box=el('div','log');
   if(date>todayISO||!canWrite) return null;
   if(LOGUI[w.id]==='rpe'||(e==='done'&&!lg&&w.status!=='swapped')){
+    const fit=FITSEL[w.id]||'plan';
+    box.append(el('div','lbl','Compared with the plan?'));
+    const sg=el('div','seg fitseg');[['plan','As planned'],['short','Cut short / easier'],['over','Longer / harder']].forEach(([k,l])=>{const b=el('button','',l);b.type='button';b.setAttribute('aria-pressed',String(fit===k));b.addEventListener('click',()=>{FITSEL[w.id]=k;renderAll()});sg.append(b)});box.append(sg);
     box.append(el('div','lbl','How hard was it? (RPE)'));
-    box.append(rpeScale(n=>saveLog(date,w.id,{done:true,rpe:n}),lg&&lg.rpe));
-    const sk=el('button','linkbtn','Save without rating');sk.type='button';sk.addEventListener('click',()=>saveLog(date,w.id,{done:true}));box.append(sk);
+    box.append(rpeScale(n=>saveLog(date,w.id,{done:true,fit,rpe:n}),lg&&lg.rpe));
+    const sk=el('button','linkbtn','Save without rating');sk.type='button';sk.addEventListener('click',()=>saveLog(date,w.id,{done:true,fit}));box.append(sk);
     return box}
-  if(lg){const t=el('div','logged'+(lg.done?'':' no'),lg.done?('Done'+(lg.rpe?' · RPE '+lg.rpe:'')):'You didn’t do it');
+  if(lg){const t=el('div','logged'+(lg.done?'':' no'),lg.done?((FITLBL[lg.fit]||'Done')+(lg.rpe?' · RPE '+lg.rpe:'')):'You didn’t do it');
     const ch=el('button','linkbtn','Change');ch.type='button';ch.addEventListener('click',()=>{LOGUI[w.id]='ask';delete S.checkins[date].workouts[w.id];renderAll()});
     const r=el('div');r.style.cssText='display:flex;gap:12px;align-items:center';r.append(t,ch);box.append(r);return box}
   if(e==='done') return null;
@@ -567,7 +597,8 @@ function renderWeek(){
     const h=el('div','dc-h'); h.append(el('b','',DOW[dt.getDay()]), el('span','',d.date===todayISO?'Today':dt.getDate()+' '+dt.toLocaleString('en',{month:'short'}))); cell.append(h);
     if(!d.items||!d.items.length) cell.append(el('div','dc-w muted','Rest'));
     (d.items||[]).forEach(w=>{const e=eff(w,d.date); if(w.status!=='optional'){nAll++; if(e==='done')nDone++}
-      const r=el('div','dc-w'); r.append(el('i',e==='planned'?'':e)); r.append(el('span','',w.title)); cell.append(r)});
+      const r=el('div','dc-w c-'+comp(w,d.date)); r.append(el('i',w.status==='optional'&&e!=='done'?'optional':'')); r.append(el('span','',w.title)); const mm=minsOf(w); if(mm) r.append(el('em','',mm+"'")); cell.append(r)});
+    const dc=dayComp(d); if(dc) cell.classList.add('dc-'+dc);
     cell.setAttribute('aria-label',fmtDay(d.date)+': '+((d.items||[]).map(w=>w.title).join(', ')||'rest')+'. '+({done:'Done',missed:'Missed',todo:'Coming up',rest:'Rest'}[stt]));
     cell.addEventListener('click',()=>openDay(d.date)); box.append(cell);
   });
@@ -673,7 +704,33 @@ function chart(host,rows,opts){
   hit.addEventListener('pointermove',move);hit.addEventListener('pointerdown',move);hit.addEventListener('pointerleave',()=>{tip.hidden=true;guide.setAttribute('opacity',0)});
   host.append(svg);host.append(tip);
 }
-function drawTrends(){ if($('#v-trends').hidden||!S.weekly.length)return;
+function formLabel(t){return t>15?['Very fresh','var(--bike)']:t>5?['Fresh, race-ready','var(--good)']:t>-10?['Neutral','var(--muted)']:t>-30?['Building fitness','var(--gym)']:['Overreaching risk','var(--bad)']}
+function drawPMC(){const host=$('#ch-pmc');if(!host||!S.pmc||!S.pmc.days)return;const all=S.pmc.days;const n=Math.min(all.length,RANGE>=999?all.length:RANGE*7);const rows=all.slice(-n);
+  const t=$('#pmc-tiles');t.replaceChildren();const last=all[all.length-1];const fl=formLabel(last.tsb);
+  const ago=all[Math.max(0,all.length-29)];
+  tile(t,'Fitness',Math.round(last.ctl),(last.ctl>=ago.ctl?'▲ ':'▼ ')+Math.abs(Math.round(last.ctl-ago.ctl))+' in 4 weeks',last.ctl>=ago.ctl?'good':'warn');
+  tile(t,'Fatigue',Math.round(last.atl),'last 7 days');
+  const ft=tile(t,'Form',(last.tsb>0?'+':'')+Math.round(last.tsb),fl[0]);ft.querySelector('.s').style.color=fl[1];
+  host.replaceChildren();const W=Math.max(300,host.clientWidth||640),H=210,m={l:30,r:8,t:10,b:24},iw=W-m.l-m.r,ih=H-m.t-m.b;
+  const svg=svgEl('svg',{viewBox:`0 0 ${W} ${H}`,role:'img','aria-label':'Fitness, fatigue and form'});
+  const hi=Math.max(20,...rows.map(r=>Math.max(r.ctl,r.atl)))*1.08, lo=Math.min(-10,...rows.map(r=>r.tsb))*1.1;
+  const y=v=>m.t+ih-(v-lo)/(hi-lo)*ih, x=i=>m.l+iw*(rows.length<2?0.5:i/(rows.length-1));
+  [Math.round(lo/10)*10,0,Math.round(hi/2/10)*10,Math.round(hi/10)*10].forEach(v=>{svg.append(svgEl('line',{x1:m.l,x2:W-m.r,y1:y(v),y2:y(v),stroke:css('--line'),'stroke-width':v===0?1.5:1}));const tx=svgEl('text',{x:m.l-5,y:y(v)+4,'text-anchor':'end'});tx.textContent=v;svg.append(tx)});
+  const bw=Math.max(1,iw/rows.length*0.8);rows.forEach((r,i)=>{const v=r.tsb;svg.append(svgEl('rect',{x:x(i)-bw/2,y:Math.min(y(v),y(0)),width:bw,height:Math.abs(y(v)-y(0)),fill:css('--gym'),opacity:.45}))});
+  const path=k=>rows.map((r,i)=>(i?'L':'M')+x(i).toFixed(1)+','+y(r[k]).toFixed(1)).join('');
+  svg.append(svgEl('path',{d:path('atl'),fill:'none',stroke:css('--test'),'stroke-width':1.5,opacity:.8}));
+  const area=path('ctl')+`L${x(rows.length-1)},${y(Math.max(lo,0))}L${x(0)},${y(Math.max(lo,0))}Z`;
+  svg.append(svgEl('path',{d:area,fill:css('--bike'),opacity:.12}));
+  svg.append(svgEl('path',{d:path('ctl'),fill:'none',stroke:css('--bike'),'stroke-width':2.5}));
+  svg.append(svgEl('circle',{cx:x(rows.length-1),cy:y(last.ctl),r:4,fill:css('--bike')}));
+  const step=Math.ceil(rows.length/6);rows.forEach((r,i)=>{if(i%step===0){const d=new Date(r.d+'T12:00:00');const tx=svgEl('text',{x:x(i),y:H-6,'text-anchor':'middle'});tx.textContent=d.getDate()+' '+d.toLocaleString('en',{month:'short'});svg.append(tx)}});
+  [['2025-12-07','70.3'],['2026-10-11','Chicago']].forEach(([d,l])=>{const i=rows.findIndex(r=>r.d===d);if(i<0)return;svg.append(svgEl('line',{x1:x(i),x2:x(i),y1:m.t,y2:m.t+ih,stroke:css('--muted'),'stroke-dasharray':'3 3'}));const tx=svgEl('text',{x:x(i)+3,y:m.t+10});tx.textContent=l;svg.append(tx)});
+  const tip=el('div','tip');tip.hidden=true;const hit=svgEl('rect',{x:m.l,y:m.t,width:iw,height:ih,fill:'transparent'});svg.append(hit);
+  const mv=ev=>{const rect=svg.getBoundingClientRect();const sx=(ev.clientX-rect.left)*(W/rect.width);const i=Math.max(0,Math.min(rows.length-1,Math.round((sx-m.l)/iw*(rows.length-1))));const r=rows[i];
+    tip.textContent=fmtDay(r.d)+' · Fitness '+Math.round(r.ctl)+' · Fatigue '+Math.round(r.atl)+' · Form '+Math.round(r.tsb)+(r.load?' · load '+r.load:'');tip.hidden=false;tip.style.left=Math.max(110,Math.min(rect.width-110,x(i)/W*rect.width))+'px';tip.style.top=(y(r.ctl)/H*rect.height)+'px'};
+  hit.addEventListener('pointermove',mv);hit.addEventListener('pointerdown',mv);hit.addEventListener('pointerleave',()=>{tip.hidden=true});
+  host.append(svg,tip)}
+function drawTrends(){ if($('#v-trends').hidden||!S.weekly.length)return; drawPMC();
   const rows=weeksInRange(); const past=rows.filter(r=>r.week<=todayISO&&r.km!=null);
   const t=$('#trend-tiles');t.replaceChildren();
   const last4=S.weekly.filter(r=>r.week<todayISO&&r.km!=null&&r.week!==S.plan?.weekStart).slice(-4);
@@ -738,7 +795,7 @@ function actionsNode(w,date){const e=eff(w,date);const rq=reqFor(w.id);
   const a=el('div','actions');[['move','Move to tomorrow'],['skip','Skip'],['easier','Make it easier'],['note','Add note']].forEach(([k,l])=>{const c=el('button','chip',l);c.type='button';c.addEventListener('click',()=>openSheet(w,date,k));a.append(c)});return a}
 function heroNode(w,date){const k=kindOf(w);const n=el('article','hero '+k.c);
   const top=el('div','top');top.append(el('span','kind',k.l));const e=eff(w,date);
-  top.append(el('span','pill '+e,(e==='done'&&PLANLBL[w.status])||EFFLBL[e]));n.append(top);
+  const cp=comp(w,date);const pl=el('span','pill cp-'+cp,e==='done'?COMPLBL[cp]:EFFLBL[e]);top.append(pl);n.append(top);
   n.append(el('h3','ttl',w.title));
   const st=el('div','stats');const m=minsOf(w);if(m){const s=el('div','stat');s.append(el('b','',m+"'"),el('span','','minutes'));st.append(s)}
   const h=hrOf(w);if(h){const s=el('div','stat');s.append(el('b','',h),el('span','','HR target'));st.append(s)}
@@ -753,7 +810,7 @@ function heroNode(w,date){const k=kindOf(w);const n=el('article','hero '+k.c);
   return n}
 function renderStrip(){const box=$('#wstrip');box.replaceChildren();if(!S.plan)return;
   const L=['M','T','W','T','F','S','S'];
-  (S.plan.days||[]).forEach((d,i)=>{const stt=dayState(d);const b=el('button','wd '+stt+(d.date===todayISO?' today':''));b.type='button';
+  (S.plan.days||[]).forEach((d,i)=>{const stt=dayState(d);const b=el('button','wd '+stt+(d.date===todayISO?' today':'')+(dayComp(d)?' wc-'+dayComp(d):''));b.type='button';
     b.append(el('span','l',L[i]||''));const dt=new Date(d.date+'T12:00:00');b.append(el('span','n',String(dt.getDate())));
     const dots=el('span','dots');(d.items||[]).slice(0,3).forEach(w=>{const k=kindOf(w);const i2=el('i');i2.style.background='var(--'+({'k-run':'run','k-q':'lane','k-bike':'bike','k-gym':'gym','k-test':'test'}[k.c])+')';dots.append(i2)});b.append(dots);
     b.setAttribute('aria-label',fmtDay(d.date)+': '+((d.items||[]).map(w=>w.title).join(', ')||'rest'));
@@ -766,12 +823,15 @@ function renderGreet(){const h=today.getHours();$('#g-hello').textContent=(h<12?
   [['2026-12-13',"Rock 'n' Roll Half",'Goal 1:29:59',true],['2027-10-31','Marine Corps Marathon','Goal 2:50',false]].forEach(([d,nm,tg,main])=>{const c=el('div','race'+(main?' main':''));
     c.append(el('span','d',String(daysTo(d))),el('span','u','days to go'),el('span','nm',nm),el('span','tg',tg));r.append(c)})}
 function renderWkHead(){const box=$('#wkhead');box.replaceChildren();if(!S.plan)return;
-  let nD=0,nA=0;(S.plan.days||[]).forEach(d=>(d.items||[]).forEach(w=>{if(w.status==='optional')return;nA++;if(eff(w,d.date)==='done')nD++}));
+  let nD=0,nA=0,mP=0,mD=0;(S.plan.days||[]).forEach(d=>(d.items||[]).forEach(w=>{const e=eff(w,d.date);const m=minsOf(w)||0;
+    if(w.status!=='optional'){nA++;mP+=m}if(e==='done'){if(w.status!=='optional')nD++;const lg=logOf(d.date,w.id);mD+=m*(lg&&lg.fit==='short'?0.7:lg&&lg.fit==='over'?1.15:1)}}));
   const pct=nA?Math.round(100*nD/nA):0;const ring=el('div','bigring');ring.style.setProperty('--p',pct);const inn=el('div');inn.append(el('b','',nD+'/'+nA),el('span','','sessions'));ring.append(inn);box.append(ring);
   const cur=S.weekly.find(r=>r.week===S.plan.weekStart)||{};const km=cur.km||0,pk=S.plan.plannedKm||0;
-  const info=el('div','wkinfo');const r1=el('div','row');r1.append(el('b','',(km||0)+' of '+(pk||'—')+' km'),el('span','muted','running'));info.append(r1);
-  const bar=el('div','bar');const bi=el('i');bi.style.width=Math.min(100,pk?100*km/pk:0)+'%';bar.append(bi);info.append(bar);
-  info.append(el('div','small muted',(S.plan.phase||'')+' · km update every Sunday'));box.append(info)}
+  const info=el('div','wkinfo');
+  const row=(lbl,done,plan,txt,col)=>{const r1=el('div','row');r1.append(el('span','muted',lbl),el('b','num',txt));info.append(r1);const bar=el('div','bar');const bi=el('i');bi.style.width=Math.min(100,plan?100*done/plan:0)+'%';if(col)bi.style.background=col;bar.append(bi);info.append(bar)};
+  row('Training time',mD,mP,'≈'+fmtHM(mD)+' / '+fmtHM(mP),'var(--accent)');
+  row('Running',km,pk,km+' / '+(pk||'—')+' km','var(--run)');
+  box.append(info)}
 
 function renderAll(){renderGreet();renderStrip();renderWkHead();renderToday();renderWeek();renderReqs();renderStreak();renderGoals();loadCheckinForm();drawTrends()}
 renderAll();
@@ -795,7 +855,7 @@ async function putJSON(path,obj,msg){
   if(!r.ok){const e=new Error('http '+r.status);e.status=r.status;throw e}
   const j=await r.json();SHA[path]=j.content.sha;return j}
 async function listDir(dir,n){const l=await api(dir);if(!Array.isArray(l))return [];return l.filter(f=>f.name.endsWith('.json')).sort((x,y)=>y.name.localeCompare(x.name)).slice(0,n)}
-function saveCache(){LS.set('fc_cache',{plan:S.plan,weekly:S.weekly,summary:S.summary,goals:S.goals,report:S.report,checkins:S.checkins,requests:S.requests})}
+function saveCache(){LS.set('fc_cache',{pmc:S.pmc,plan:S.plan,weekly:S.weekly,summary:S.summary,goals:S.goals,report:S.report,checkins:S.checkins,requests:S.requests})}
 const cached=LS.get('fc_cache');
 if(cached){Object.assign(S,cached);renderAll()}
 let loading=false, lastWrite=0;
@@ -803,7 +863,7 @@ async function loadAll(){
   if(!CFG||!CFG.token){openSetup();return}
   if(loading)return;loading=true;
   try{
-    const [plan,weekly,summary,goals,report]=await Promise.all(['plan','weekly','summary','goals','report'].map(k=>getJSON('coach/'+k+'.json')));
+    const [plan,weekly,summary,goals,report,pmc]=await Promise.all(['plan','weekly','summary','goals','report','pmc'].map(k=>getJSON('coach/'+k+'.json')));if(pmc)S.pmc=pmc;
     if(plan)S.plan=plan;if(weekly)S.weekly=weekly.rows||[];if(summary)S.summary=summary;if(goals)S.goals=goals;if(report)S.report=report;
     if(Date.now()-lastWrite>20000){
       const [ci,rq]=await Promise.all([listDir('checkins',14),listDir('requests',30)]);
