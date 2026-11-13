@@ -138,6 +138,44 @@ nav.tabs .in{display:grid;grid-template-columns:repeat(4,1fr);width:100%;max-wid
 .row2{display:flex;gap:8px}
 .row2 button{flex:1}
 .ghost{background:none;border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:12px 16px;font-weight:600}
+/* calendar */
+.cal{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+@media (min-width:640px){.cal{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.dcell{background:var(--surface);border:1px solid var(--line);border-left:5px solid var(--line);border-radius:10px;padding:10px 10px 10px 10px;text-align:left;color:var(--ink);display:flex;flex-direction:column;gap:6px;min-height:92px;min-width:0}
+.dcell:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.dcell.done{border-left-color:var(--good);background:var(--good-soft)}
+.dcell.missed{border-left-color:var(--bad);background:var(--bad-soft)}
+.dcell.todo{border-left-color:var(--muted)}
+.dcell.rest{border-left-color:var(--line);opacity:.75}
+.dcell.today{box-shadow:0 0 0 2px var(--lane)}
+.dc-h{display:flex;justify-content:space-between;align-items:baseline;gap:6px}
+.dc-h b{font-family:var(--display);font-size:17px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+.dc-h span{font-size:11.5px;color:var(--muted);font-weight:600}
+.dc-w{display:flex;align-items:flex-start;gap:6px;font-size:12.5px;line-height:1.3;min-width:0}
+.dc-w i{flex:none;width:8px;height:8px;border-radius:50%;margin-top:4px;background:var(--muted)}
+.dc-w i.done{background:var(--good)} .dc-w i.missed{background:var(--bad)} .dc-w i.optional{background:transparent;border:1.5px solid var(--info)}
+.dc-w span{min-width:0;overflow-wrap:anywhere}
+.dc-sum{background:var(--accent-soft);border:1px solid var(--line);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:2px;justify-content:center}
+.dc-sum .v{font-family:var(--display);font-size:26px;font-weight:600;line-height:1}
+.dc-sum .k{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.daypanel{max-height:88vh;overflow-y:auto}
+.ds-top{display:flex;justify-content:space-between;align-items:center}
+.ds-body{display:flex;flex-direction:column;gap:16px}
+.ds-body .wo{border-top:1px solid var(--line);padding-top:14px}
+.ds-body .wo:first-child{border-top:0;padding-top:0}
+/* workout log */
+.log{display:flex;flex-direction:column;gap:8px;background:var(--bg);border-radius:8px;padding:10px}
+.log .lbl{font-size:13px;font-weight:600}
+.log .row2 button{padding:9px 10px}
+.logged{font-size:13px;color:var(--good);font-weight:600}
+.logged.no{color:var(--bad)}
+.linkbtn{background:none;border:0;color:var(--accent);font-weight:600;font-size:13px;padding:0;text-decoration:underline}
+/* check-in done */
+.ci-done{display:flex;align-items:center;gap:12px}
+.ci-tick{flex:none;width:36px;height:36px;border-radius:50%;background:var(--good);display:grid;place-items:center}
+.ci-tick svg{width:20px;height:20px;stroke:var(--surface);fill:none;stroke-width:2.6}
+.ci-text{flex:1;display:flex;flex-direction:column;min-width:0}
+.explain p{margin:0 0 6px}
 .gear{background:none;border:1px solid var(--line);border-radius:8px;width:38px;height:38px;display:grid;place-items:center;color:var(--ink)}
 .gear svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.6}
 .setup label{font-size:13px;font-weight:600}
@@ -172,22 +210,26 @@ nav.tabs .in{display:grid;grid-template-columns:repeat(4,1fr);width:100%;max-wid
     </div>
     <div class="sec" id="checkin-sec">
       <h2>Daily check-in</h2>
+      <div class="card ci-done" id="ci-summary" hidden>
+        <div class="ci-tick" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
+        <div class="ci-text"><b>Checked in for today</b><span class="small muted" id="ci-sum-text"></span></div>
+        <button class="chip" id="ci-edit" type="button">Edit</button>
+      </div>
       <div class="card form" id="checkin">
+        <div class="small muted">Three taps and it saves itself.</div>
         <div class="q"><span class="lbl">Sleep</span>
           <div class="scale" data-k="sleep"></div><div class="ends"><span>Awful</span><span>Great</span></div></div>
         <div class="q"><span class="lbl">Legs</span>
           <div class="scale" data-k="legs"></div><div class="ends"><span>Very sore</span><span>Fresh</span></div></div>
         <div class="q"><span class="lbl">Energy and mood</span>
           <div class="scale" data-k="energy"></div><div class="ends"><span>Drained</span><span>Buzzing</span></div></div>
-        <div class="q"><span class="lbl">How hard did today's session feel? (RPE)</span>
-          <div class="scale ten" data-k="rpe" data-n="10"></div><div class="ends"><span>1 very easy</span><span>10 max</span></div></div>
         <div class="q"><span class="lbl">Any pain lasting 2+ days?</span>
           <div class="seg" id="pain-seg"><button type="button" data-v="no" aria-pressed="true">No</button><button type="button" data-v="yes" aria-pressed="false">Yes</button></div>
           <input type="text" id="pain-where" placeholder="Where, and how bad out of 10" hidden>
         </div>
         <div class="q"><label for="ci-note">Note for coach (optional)</label>
-          <textarea id="ci-note" placeholder="Exams, travel, how the run went…"></textarea></div>
-        <button class="primary" id="ci-save" type="button">Save check-in</button>
+          <textarea id="ci-note" placeholder="Exams, travel, anything I should know…"></textarea></div>
+        <button class="primary" id="ci-save" type="button">Done</button>
         <div class="status" id="ci-status" role="status"></div>
       </div>
       <div class="card">
@@ -202,7 +244,8 @@ nav.tabs .in{display:grid;grid-template-columns:repeat(4,1fr);width:100%;max-wid
     <div class="sec">
       <h2 id="week-h">This week</h2>
       <div class="tiles" id="week-tiles"></div>
-      <div class="card" id="week-list"><p class="empty">Loading the week…</p></div>
+      <div class="legend"><span><i style="background:var(--good)"></i>Done</span><span><i style="background:var(--muted)"></i>Coming up</span><span><i style="background:var(--bad)"></i>Missed</span><span>Tap a day for details</span></div>
+      <div class="cal" id="week-list"><p class="empty">Loading the week…</p></div>
     </div>
     <div class="sec">
       <h2>Your requests</h2>
@@ -224,8 +267,8 @@ nav.tabs .in{display:grid;grid-template-columns:repeat(4,1fr);width:100%;max-wid
       <div class="card"><div class="legend"><span><i style="background:var(--accent)"></i>Actual</span><span><i style="background:var(--lane)"></i>Planned</span></div><div class="chart" id="ch-km"></div></div>
     </div>
     <div class="sec" id="c-easy">
-      <h2>Easy running share</h2>
-      <div class="card"><div class="small muted">% of run time in the easy zones. Target: 75–80%.</div><div class="chart" id="ch-easy"></div></div>
+      <h2>How much of your running was easy</h2>
+      <div class="card"><div class="explain"><p>Of all the minutes you ran each week, how many were <b>truly easy</b> (heart rate under about 152)?</p><p class="small muted">Good marathon training is about 75–80% easy (the green band). Easy running builds the engine; too many medium-hard runs leave you tired without the benefit. Before Chicago you were often near 20–30%.</p></div><div class="chart" id="ch-easy"></div></div>
     </div>
     <div class="sec" id="c-ef">
       <h2>Aerobic efficiency</h2>
@@ -257,6 +300,13 @@ nav.tabs .in{display:grid;grid-template-columns:repeat(4,1fr);width:100%;max-wid
   <button class="tab" data-v="trends"><svg viewBox="0 0 24 24"><path d="M4 19h16"/><path d="M5 15l4-4 4 3 6-7"/></svg>Trends</button>
   <button class="tab" data-v="goals"><svg viewBox="0 0 24 24"><path d="M6 21V4M6 4h11l-2 4 2 4H6"/></svg>Goals</button>
 </div></nav>
+
+<div class="sheet" id="daysheet" hidden>
+  <div class="panel daypanel" role="dialog" aria-modal="true" aria-labelledby="ds-h">
+    <div class="ds-top"><h3 id="ds-h">Day</h3><button class="chip" id="ds-close" type="button">Close</button></div>
+    <div id="ds-body" class="ds-body"></div>
+  </div>
+</div>
 
 <div class="sheet" id="sheet" hidden>
   <div class="panel" role="dialog" aria-modal="true" aria-labelledby="sheet-h">
@@ -308,20 +358,52 @@ let db=null, canWrite=true;
 
 /* ---------- workouts ---------- */
 const SPORT={run:['Run',''],bike:['Bike','bike'],strength:['Gym','gym'],test:['Test','test'],swim:['Swim','bike']};
-const STATUS={done:'Done',partial:'Partly',missed:'Missed',swapped:'Swapped',planned:'Planned',optional:'Optional'};
+const PLANLBL={partial:'Partly done',swapped:'Swapped'};
+const EFFLBL={done:'Done',missed:'Missed',planned:'Coming up',optional:'Optional'};
 function reqFor(id){return S.requests.find(r=>r.workoutId===id && r.status!=='done')}
+function logOf(date,id){const c=S.checkins[date];return c&&c.workouts&&c.workouts[id]||null}
+function eff(w,date){const lg=logOf(date,w.id);
+  if(lg&&lg.done===true)return 'done'; if(lg&&lg.done===false)return 'missed';
+  const st=w.status||'planned'; if(st==='done'||st==='partial'||st==='swapped')return 'done'; if(st==='missed')return 'missed';
+  if(st==='optional')return 'optional'; return date<todayISO?'missed':'planned'}
+const LOGUI={};
+async function saveLog(date,wid,patch){
+  const cur=Object.assign({date},S.checkins[date]||{}); cur.workouts=Object.assign({},cur.workouts||{});
+  cur.workouts[wid]=Object.assign({},cur.workouts[wid]||{},patch,{at:new Date().toISOString()});
+  S.checkins[date]=cur; delete LOGUI[wid]; renderAll();
+  try{ if(!db) throw new Error('offline'); const copy=Object.assign({},cur); delete copy.id; await db.doc('checkins/'+date).set(copy);}
+  catch(e){showBanner('Couldn’t save that. Check your connection and try again.')}}
+function rpeScale(onPick,current){const sc=el('div','scale ten');for(let i=1;i<=10;i++){const bt=el('button','',String(i));bt.type='button';bt.setAttribute('aria-label','RPE '+i);bt.setAttribute('aria-pressed',String(current===i));bt.addEventListener('click',()=>onPick(i));sc.append(bt)}
+  const wrap=el('div');wrap.append(sc);const ends=el('div','ends');ends.append(el('span','','1 very easy'),el('span','','10 all out'));wrap.append(ends);return wrap}
+function logNode(w,date){
+  const lg=logOf(date,w.id), e=eff(w,date), box=el('div','log');
+  if(date>todayISO||!canWrite) return null;
+  if(LOGUI[w.id]==='rpe'||(e==='done'&&!lg&&w.status!=='swapped')){
+    box.append(el('div','lbl','How hard was it? (RPE)'));
+    box.append(rpeScale(n=>saveLog(date,w.id,{done:true,rpe:n}),lg&&lg.rpe));
+    const sk=el('button','linkbtn','Save without rating');sk.type='button';sk.addEventListener('click',()=>saveLog(date,w.id,{done:true}));box.append(sk);
+    return box}
+  if(lg){const t=el('div','logged'+(lg.done?'':' no'),lg.done?('Done'+(lg.rpe?' · RPE '+lg.rpe:'')):'You didn’t do it');
+    const ch=el('button','linkbtn','Change');ch.type='button';ch.addEventListener('click',()=>{LOGUI[w.id]='ask';delete S.checkins[date].workouts[w.id];renderAll()});
+    const r=el('div');r.style.cssText='display:flex;gap:12px;align-items:center';r.append(t,ch);box.append(r);return box}
+  if(e==='done') return null;
+  box.append(el('div','lbl','Did you do it?'));
+  const r=el('div','row2');const y=el('button','primary','Done');y.type='button';y.addEventListener('click',()=>{LOGUI[w.id]='rpe';renderAll()});
+  const no=el('button','ghost','Didn’t do it');no.type='button';no.addEventListener('click',()=>saveLog(date,w.id,{done:false}));
+  r.append(y,no);box.append(r);return box}
 function woNode(w,date,withActions){
   const n=el('div','wo'); const sp=SPORT[w.sport]||['—',''];
   n.append(el('span','sport '+sp[1],sp[0]));
   const t=el('div','wo-title'); t.textContent=w.title; n.append(t);
   const b=el('div','wo-body');
   const meta=el('div'); meta.style.cssText='display:flex;gap:6px;flex-wrap:wrap';
-  const st=w.status||'planned'; meta.append(el('span','pill '+st,STATUS[st]||st));
+  const e=eff(w,date); meta.append(el('span','pill '+e,(e==='done'&&PLANLBL[w.status])||EFFLBL[e]));
   const rq=reqFor(w.id); if(rq) meta.append(el('span','pill req','Request sent: '+REQLABEL[rq.kind]));
   b.append(meta);
   if(w.target) b.append(el('div','target',w.target));
   if(w.result) b.append(el('div','result',w.result));
-  if(withActions && (st==='planned'||st==='optional') && date>=todayISO && canWrite && !rq){
+  const lg=logNode(w,date); if(lg) b.append(lg);
+  if(withActions && (e==='planned'||e==='optional') && date>=todayISO && canWrite && !rq && !logOf(date,w.id) && !LOGUI[w.id]){
     const a=el('div','actions');
     [['move','Move to tomorrow'],['skip','Skip'],['easier','Make it easier'],['note','Add note']].forEach(([k,l])=>{
       const c=el('button','chip',l); c.type='button'; c.addEventListener('click',()=>openSheet(w,date,k)); a.append(c);});
@@ -341,28 +423,38 @@ function renderToday(){
   const wrap=el('div'); wrap.style.cssText='display:flex;flex-direction:column;gap:14px';
   d.items.forEach(w=>wrap.append(woNode(w,d.date,true))); box.append(wrap);
 }
+function dayState(d){const its=(d.items||[]).filter(w=>w.status!=='optional');if(!its.length)return (d.items||[]).length?'todo':'rest';
+  const es=its.map(w=>eff(w,d.date));if(es.includes('missed'))return 'missed';if(es.every(x=>x==='done'))return 'done';return 'todo'}
+let openDayDate=null;
+function openDay(date){openDayDate=date;renderDaySheet();$('#daysheet').hidden=false}
+function renderDaySheet(){if(!openDayDate||!S.plan)return;const d=(S.plan.days||[]).find(x=>x.date===openDayDate);if(!d)return;
+  $('#ds-h').textContent=fmtDay(d.date)+(d.date===todayISO?' · today':'');const body=$('#ds-body');body.replaceChildren();
+  if(!d.items||!d.items.length){body.append(el('p','empty','Rest day. Walk, stretch, sleep well.'));return}
+  d.items.forEach(w=>body.append(woNode(w,d.date,true)))}
+$('#ds-close').addEventListener('click',()=>{$('#daysheet').hidden=true;openDayDate=null});
+$('#daysheet').addEventListener('click',e=>{if(e.target.id==='daysheet'){$('#daysheet').hidden=true;openDayDate=null}});
 function renderWeek(){
   const box=$('#week-list'); box.replaceChildren();
   if(!S.plan){box.append(el('p','empty','No plan loaded yet.'));return}
   $('#week-h').textContent='Week of '+fmtDay(S.plan.weekStart);
   $('#hdr-sub').textContent=(S.plan.phase||'')+' · week of '+fmtDay(S.plan.weekStart).slice(4);
+  let nDone=0,nAll=0;
   (S.plan.days||[]).forEach(d=>{
-    const day=el('div','day'+(d.date===todayISO?' today':''));
-    const h=el('div','day-h'); h.append(el('b','',fmtDay(d.date)+(d.date===todayISO?' · today':'')));
-    day.append(h);
-    if(!d.items||!d.items.length) day.append(el('div','empty','Rest'));
-    d.items&&d.items.forEach(w=>day.append(woNode(w,d.date,true)));
-    box.append(day);
+    const stt=dayState(d); const cell=el('button','dcell '+stt+(d.date===todayISO?' today':'')); cell.type='button';
+    const dt=new Date(d.date+'T12:00:00');
+    const h=el('div','dc-h'); h.append(el('b','',DOW[dt.getDay()]), el('span','',d.date===todayISO?'Today':dt.getDate()+' '+dt.toLocaleString('en',{month:'short'}))); cell.append(h);
+    if(!d.items||!d.items.length) cell.append(el('div','dc-w muted','Rest'));
+    (d.items||[]).forEach(w=>{const e=eff(w,d.date); if(w.status!=='optional'){nAll++; if(e==='done')nDone++}
+      const r=el('div','dc-w'); r.append(el('i',e==='planned'?'':e)); r.append(el('span','',w.title)); cell.append(r)});
+    cell.setAttribute('aria-label',fmtDay(d.date)+': '+((d.items||[]).map(w=>w.title).join(', ')||'rest')+'. '+({done:'Done',missed:'Missed',todo:'Coming up',rest:'Rest'}[stt]));
+    cell.addEventListener('click',()=>openDay(d.date)); box.append(cell);
   });
-  // tiles
-  const t=$('#week-tiles'); t.replaceChildren();
   const cur=S.weekly.find(r=>r.week===S.plan.weekStart)||{};
-  const all=(S.plan.days||[]).flatMap(d=>d.items||[]).filter(w=>w.status!=='optional');
-  const done=all.filter(w=>['done','partial','swapped'].includes(w.status)).length;
-  tile(t,'Run km',(cur.km??'—')+(S.plan.plannedKm?' / '+S.plan.plannedKm:''),'planned '+(S.plan.plannedKm||'—')+' km');
-  tile(t,'Sessions done',done+' / '+all.length,'optional ones not counted');
-  tile(t,'Easy share',cur.easyPct!=null?cur.easyPct+'%':'—',cur.easyPct!=null?(cur.easyPct>=75?'on target':'below 75% target'):'',cur.easyPct!=null&&cur.easyPct<75?'warn':'good');
-  if(S.summary&&S.summary.focus){const f=el('div','card small');f.style.gridColumn='1/-1';f.textContent='Focus: '+S.summary.focus;t.append(f)}
+  const sum=el('div','dc-sum'); sum.append(el('div','k','Sessions done')); sum.append(el('div','v num',nDone+' / '+nAll));
+  sum.append(el('div','k','Run km')); sum.append(el('div','v num',(cur.km??'—')+(S.plan.plannedKm?' / '+S.plan.plannedKm:''))); box.append(sum);
+  const t=$('#week-tiles'); t.replaceChildren();
+  if(S.summary&&S.summary.focus){const f=el('div','card small');f.style.gridColumn='1/-1';f.textContent='Focus this week: '+S.summary.focus;t.append(f)}
+  renderDaySheet();
 }
 function tile(parent,k,v,s,tone){const n=el('div','tile');n.append(el('div','k',k));const vv=el('div','v num',v);n.append(vv);if(s){const ss=el('div','s',s);if(tone)ss.style.color='var(--'+tone+')';n.append(ss)}parent.append(n);return n}
 
@@ -377,7 +469,7 @@ $('#sheet-ok').addEventListener('click',async()=>{
   if(!sheetCtx)return; const {w,date,kind}=sheetCtx; const btn=$('#sheet-ok'); btn.disabled=true;
   const doc={workoutId:w.id,date,title:w.title,kind,note:$('#sheet-note').value.trim(),status:'open',createdAt:new Date().toISOString()};
   try{ if(!db) throw new Error('offline'); await db.collection('requests').add(doc); $('#sheet').hidden=true; }
-  catch(e){ $('#sheet-wo').textContent='Not sent: '+('no connection. Try again.'); }
+  catch(e){ $('#sheet-wo').textContent='Not sent: '+(e&&e.code==='invalid_argument'?'you can only view this page.':'no connection. Try again.'); }
   btn.disabled=false;
 });
 function renderReqs(){
@@ -391,27 +483,35 @@ function renderReqs(){
 }
 
 /* ---------- check-in ---------- */
-const CI={sleep:null,legs:null,energy:null,rpe:null,pain:'no'};
-$$('.scale').forEach(s=>{const n=+(s.dataset.n||5);for(let i=1;i<=n;i++){const b=el('button','',String(i));b.type='button';b.setAttribute('aria-pressed','false');b.setAttribute('aria-label',s.dataset.k+' '+i);
-  b.addEventListener('click',()=>{CI[s.dataset.k]=i;paintScale(s)});s.append(b)}});
+const CI={sleep:null,legs:null,energy:null,pain:'no'}; let ciEditing=false, ciSaving=false;
+$$('.scale[data-k]').forEach(s=>{const n=+(s.dataset.n||5);for(let i=1;i<=n;i++){const b=el('button','',String(i));b.type='button';b.setAttribute('aria-pressed','false');b.setAttribute('aria-label',s.dataset.k+' '+i);
+  b.addEventListener('click',()=>{CI[s.dataset.k]=i;paintScale(s);if(!ciEditing&&CI.sleep!=null&&CI.legs!=null&&CI.energy!=null)saveCheckin(true)});s.append(b)}});
 function paintScale(s){[...s.children].forEach((b,i)=>b.setAttribute('aria-pressed',String(CI[s.dataset.k]===i+1)))}
 $$('#pain-seg button').forEach(b=>b.addEventListener('click',()=>{CI.pain=b.dataset.v;$$('#pain-seg button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));$('#pain-where').hidden=CI.pain!=='yes'}));
-function loadCheckinForm(){const c=S.checkins[todayISO]; if(!c)return;
-  ['sleep','legs','energy','rpe'].forEach(k=>{CI[k]=c[k]??null}); CI.pain=c.pain?'yes':'no';
-  $$('.scale').forEach(paintScale); $$('#pain-seg button').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.v===CI.pain)));
-  $('#pain-where').hidden=CI.pain!=='yes'; $('#pain-where').value=c.painWhere||''; $('#ci-note').value=c.note||'';
-  $('#ci-save').textContent='Update check-in'; $('#ci-status').className='status ok'; $('#ci-status').textContent='Saved for today.';}
-$('#ci-save').addEventListener('click',async()=>{
+const WORD={1:'awful',2:'poor',3:'ok',4:'good',5:'great'};
+function loadCheckinForm(){const c=S.checkins[todayISO]; const has=c&&c.sleep!=null;
+  if(ciEditing)return;
+  $('#ci-summary').hidden=!has; $('#checkin').hidden=!!has;
+  if(has){$('#ci-sum-text').textContent='Sleep '+c.sleep+' · legs '+c.legs+' · energy '+c.energy+(c.pain?' · pain: '+(c.painWhere||'yes'):'')+(c.note?' · note added':'');
+    ['sleep','legs','energy'].forEach(k=>{CI[k]=c[k]??null}); CI.pain=c.pain?'yes':'no';
+    $$('.scale[data-k]').forEach(paintScale); $$('#pain-seg button').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.v===CI.pain)));
+    $('#pain-where').hidden=CI.pain!=='yes'; $('#pain-where').value=c.painWhere||''; $('#ci-note').value=c.note||''}}
+$('#ci-edit').addEventListener('click',()=>{ciEditing=true;$('#ci-summary').hidden=true;$('#checkin').hidden=false;$('#ci-status').textContent=''});
+async function saveCheckin(collapse){
   const st=$('#ci-status');
   if(CI.sleep==null||CI.legs==null||CI.energy==null){st.className='status err';st.textContent='Pick sleep, legs and energy first.';return}
-  const doc={date:todayISO,sleep:CI.sleep,legs:CI.legs,energy:CI.energy,rpe:CI.rpe,pain:CI.pain==='yes',painWhere:CI.pain==='yes'?$('#pain-where').value.trim():'',note:$('#ci-note').value.trim(),savedAt:new Date().toISOString()};
-  $('#ci-save').disabled=true;
-  try{ if(!db) throw new Error('offline'); await db.doc('checkins/'+todayISO).set(doc); st.className='status ok';st.textContent='Saved. Thanks.'; $('#ci-save').textContent='Update check-in';}
-  catch(e){st.className='status err';st.textContent='Couldn’t save: no connection. Try again.'}
-  $('#ci-save').disabled=false;
-});
+  if(ciSaving)return; ciSaving=true;
+  const prev=S.checkins[todayISO]||{};
+  const doc=Object.assign({},prev,{date:todayISO,sleep:CI.sleep,legs:CI.legs,energy:CI.energy,pain:CI.pain==='yes',painWhere:CI.pain==='yes'?$('#pain-where').value.trim():'',note:$('#ci-note').value.trim(),savedAt:new Date().toISOString()});
+  delete doc.id; delete doc.rpe;
+  st.className='status';st.textContent='Saving…';
+  try{ if(!db) throw new Error('offline'); await db.doc('checkins/'+todayISO).set(doc); S.checkins[todayISO]=doc; st.textContent='';
+    if(collapse){ciEditing=false;loadCheckinForm();renderStreak()}}
+  catch(e){st.className='status err';st.textContent='Couldn’t save: no connection. Tap Done to try again.'}
+  ciSaving=false}
+$('#ci-save').addEventListener('click',()=>saveCheckin(true));
 function renderStreak(){const s=$('#streak');s.replaceChildren();for(let i=6;i>=0;i--){const d=new Date(today);d.setDate(d.getDate()-i);const k=iso(d);
-  const c=el('div');const dot=el('i',S.checkins[k]?'on':'');dot.title=k;c.append(dot);c.append(document.createTextNode(DOW[d.getDay()][0]));s.append(c)}}
+  const c=el('div');const dot=el('i',S.checkins[k]&&S.checkins[k].sleep!=null?'on':'');dot.title=k;c.append(dot);c.append(document.createTextNode(DOW[d.getDay()][0]));s.append(c)}}
 
 /* ---------- charts ---------- */
 let RANGE=12;
@@ -457,11 +557,11 @@ function drawTrends(){ if($('#v-trends').hidden||!S.weekly.length)return;
   const last4=S.weekly.filter(r=>r.week<todayISO&&r.km!=null&&r.week!==S.plan?.weekStart).slice(-4);
   const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
   const km4=avg(last4.map(r=>r.km)); tile(t,'Avg km · last 4 wk',km4!=null?km4.toFixed(0):'—','target this block: 35–46');
-  const e4=avg(last4.map(r=>r.easyPct).filter(v=>v!=null)); tile(t,'Easy share · 4 wk',e4!=null?Math.round(e4)+'%':'—','target 75–80%',e4!=null&&e4<75?'warn':'good');
+  const e4=avg(last4.map(r=>r.easyPct).filter(v=>v!=null)); tile(t,'Easy running · 4 wk',e4!=null?Math.round(e4)+'%':'—','of your minutes; aim for 75–80%',e4!=null&&e4<75?'warn':'good');
   const ef=[...S.weekly].reverse().find(r=>r.ef!=null&&r.week<=todayISO); tile(t,'Efficiency',ef?ef.ef.toFixed(2):'—','was 1.17–1.25 all summer');
   if(S.summary&&S.summary.intensityScore!=null) tile(t,'Intensity score',S.summary.intensityScore+'/10',S.summary.intensityNote||'');
   chart($('#ch-km'),rows,{label:'Weekly running km',series:[{key:'km',name:'Actual',type:'bar',color:'--accent',unit:' km'},{key:'plannedKm',name:'Planned',color:'--lane',dash:true,unit:' km'}],min:0,ticks:[0,20,40,60]});
-  chart($('#ch-easy'),rows,{label:'Easy share',series:[{key:'easyPct',name:'Easy',color:'--accent',unit:'%'}],min:0,max:100,ticks:[0,50,75,100],band:[75,80]});
+  chart($('#ch-easy'),rows,{label:'Easy running',series:[{key:'easyPct',name:'Easy minutes',color:'--accent',unit:'%'}],min:0,max:100,ticks:[0,50,75,100],band:[75,80]});
   chart($('#ch-ef'),rows,{label:'Efficiency factor',series:[{key:'ef',name:'EF',color:'--info'}],pad:true,fmt:v=>(+v).toFixed(2)});
   chart($('#ch-hr'),rows,{label:'Median easy HR',series:[{key:'easyHR',name:'HR',color:'--lane',unit:' bpm'}],min:120,max:170,ticks:[120,140,152,170],band:[140,152]});
 }
@@ -493,40 +593,45 @@ let CFG=LS.get('fc_cfg');
 const SHA={};
 const b64e=s=>btoa(unescape(encodeURIComponent(s)));
 const b64d=s=>decodeURIComponent(escape(atob(s.replace(/\n/g,''))));
-function api(path,opt={}){return fetch('https://api.github.com/repos/'+CFG.owner+'/'+CFG.repo+'/contents/'+path,Object.assign({cache:'no-store'},opt,{headers:Object.assign({'Authorization':'Bearer '+CFG.token,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'},opt.headers||{})})).then(async r=>{if(r.status===404)return null;if(!r.ok){const e=new Error('http '+r.status);e.status=r.status;throw e}return r.json()})}
+const GHH=()=>({'Authorization':'Bearer '+CFG.token,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'});
+const URLC=p=>'https://api.github.com/repos/'+CFG.owner+'/'+CFG.repo+'/contents/'+p;
+function api(path){return fetch(URLC(path)+'?t='+Date.now(),{cache:'no-store',headers:GHH()}).then(async r=>{if(r.status===404)return null;if(!r.ok){const e=new Error('http '+r.status);e.status=r.status;throw e}return r.json()})}
 async function getJSON(path){const j=await api(path);if(!j)return null;SHA[path]=j.sha;return JSON.parse(b64d(j.content))}
 async function putJSON(path,obj,msg){
   const body={message:msg||('app: '+path),content:b64e(JSON.stringify(obj,null,1))};
   if(SHA[path])body.sha=SHA[path];
-  let r=await fetch('https://api.github.com/repos/'+CFG.owner+'/'+CFG.repo+'/contents/'+path,{method:'PUT',headers:{'Authorization':'Bearer '+CFG.token,'Accept':'application/vnd.github+json','Content-Type':'application/json'},body:JSON.stringify(body)});
-  if(r.status===409||r.status===422){const cur=await api(path);if(cur){SHA[path]=cur.sha;body.sha=cur.sha;r=await fetch('https://api.github.com/repos/'+CFG.owner+'/'+CFG.repo+'/contents/'+path,{method:'PUT',headers:{'Authorization':'Bearer '+CFG.token,'Accept':'application/vnd.github+json','Content-Type':'application/json'},body:JSON.stringify(body)})}}
+  const go=()=>fetch(URLC(path),{method:'PUT',headers:Object.assign({'Content-Type':'application/json'},GHH()),body:JSON.stringify(body)});
+  let r=await go();
+  if(r.status===409||r.status===422){const cur=await api(path);if(cur){body.sha=cur.sha;r=await go()}}
   if(!r.ok){const e=new Error('http '+r.status);e.status=r.status;throw e}
   const j=await r.json();SHA[path]=j.content.sha;return j}
 async function listDir(dir,n){const l=await api(dir);if(!Array.isArray(l))return [];return l.filter(f=>f.name.endsWith('.json')).sort((x,y)=>y.name.localeCompare(x.name)).slice(0,n)}
+function saveCache(){LS.set('fc_cache',{plan:S.plan,weekly:S.weekly,summary:S.summary,goals:S.goals,report:S.report,checkins:S.checkins,requests:S.requests})}
 const cached=LS.get('fc_cache');
 if(cached){Object.assign(S,cached);renderAll()}
-let loading=false;
+let loading=false, lastWrite=0;
 async function loadAll(){
   if(!CFG||!CFG.token){openSetup();return}
   if(loading)return;loading=true;
   try{
     const [plan,weekly,summary,goals,report]=await Promise.all(['plan','weekly','summary','goals','report'].map(k=>getJSON('coach/'+k+'.json')));
     if(plan)S.plan=plan;if(weekly)S.weekly=weekly.rows||[];if(summary)S.summary=summary;if(goals)S.goals=goals;if(report)S.report=report;
-    const [ci,rq]=await Promise.all([listDir('checkins',14),listDir('requests',30)]);
-    const cis=await Promise.all(ci.map(f=>getJSON(f.path)));S.checkins={};cis.forEach((v,i)=>{if(v)S.checkins[v.date||ci[i].name.slice(0,10)]=v});
-    const rqs=await Promise.all(rq.map(f=>getJSON(f.path)));S.requests=rqs.map((v,i)=>v&&Object.assign({id:rq[i].name},v)).filter(Boolean);
-    LS.set('fc_cache',{plan:S.plan,weekly:S.weekly,summary:S.summary,goals:S.goals,report:S.report,checkins:S.checkins,requests:S.requests});
-    $('#banner').hidden=true;renderAll();
+    if(Date.now()-lastWrite>20000){
+      const [ci,rq]=await Promise.all([listDir('checkins',14),listDir('requests',30)]);
+      const cis=await Promise.all(ci.map(f=>getJSON(f.path)));const nc={};cis.forEach((v,i)=>{if(v)nc[v.date||ci[i].name.slice(0,10)]=v});S.checkins=nc;
+      const rqs=await Promise.all(rq.map(f=>getJSON(f.path)));S.requests=rqs.map((v,i)=>v&&Object.assign({id:rq[i].name},v)).filter(Boolean);
+    }
+    saveCache();$('#banner').hidden=true;renderAll();
   }catch(e){showBanner(e.status===401||e.status===403?'Your access key was refused. Tap the gear and paste a new one.':'Can’t reach your data right now. Showing the last saved copy.')}
   loading=false}
 db={
-  doc:p=>({set:async o=>{await putJSON(p+'.json',o,'check-in '+(o.date||''));loadAll()}}),
-  collection:c=>({add:async o=>{const id=new Date().toISOString().replace(/[:.]/g,'-')+'-'+Math.random().toString(36).slice(2,6);await putJSON(c+'/'+id+'.json',o,'request: '+(o.kind||''));loadAll()}})
+  doc:p=>({set:async o=>{lastWrite=Date.now();await putJSON(p+'.json',o,'check-in '+(o.date||''));saveCache()}}),
+  collection:c=>({add:async o=>{lastWrite=Date.now();const id=new Date().toISOString().replace(/[:.]/g,'-')+'-'+Math.random().toString(36).slice(2,6);await putJSON(c+'/'+id+'.json',o,'request: '+(o.kind||''));if(c==='requests'){S.requests.unshift(Object.assign({id:id+'.json'},o));saveCache();renderAll()}}})
 };
 function openSetup(){const c=CFG||{};$('#cfg-owner').value=c.owner||'';$('#cfg-repo').value=c.repo||'fonsi-coach-data';$('#cfg-token').value=c.token?'••••••••':'';$('#cfg-status').textContent='';$('#setup').hidden=false}
 $('#gear').addEventListener('click',openSetup);
 $('#cfg-cancel').addEventListener('click',()=>{$('#setup').hidden=true});
-$('#cfg-refresh').addEventListener('click',()=>{$('#setup').hidden=true;loadAll()});
+$('#cfg-refresh').addEventListener('click',()=>{$('#setup').hidden=true;lastWrite=0;loadAll()});
 $('#cfg-save').addEventListener('click',async()=>{
   const st=$('#cfg-status');const tok=$('#cfg-token').value.trim();
   const n={owner:$('#cfg-owner').value.trim(),repo:$('#cfg-repo').value.trim()||'fonsi-coach-data',token:tok.startsWith('••')&&CFG?CFG.token:tok};
