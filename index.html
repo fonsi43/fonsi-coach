@@ -320,7 +320,7 @@ header.top .count{display:none}
 
 <div class="app">
   <header class="top">
-    <div class="brand">Fonsi Coach<small id="hdr-sub">Half block · week of 9 Nov</small></div>
+    <div class="brand" id="brand">Coach<small id="hdr-sub">Half block · week of 9 Nov</small></div>
     <div style="display:flex;gap:14px;align-items:flex-end">
     <div class="count">
       <div><span id="cd-half" class="num">—</span><span>days to half</span></div>
@@ -334,7 +334,7 @@ header.top .count{display:none}
 
   <!-- TODAY -->
   <section class="view" id="v-today">
-    <div class="greet"><span class="eyebrow" id="g-date"></span><span class="hello" id="g-hello">Hi Fonsi</span><span class="phase" id="g-phase"></span></div>
+    <div class="greet"><span class="eyebrow" id="g-date"></span><span class="hello" id="g-hello">Hi</span><span class="phase" id="g-phase"></span></div>
     <div class="wstrip" id="wstrip" aria-label="This week"></div>
     <div class="sec" id="today-sec">
       <h2 id="today-h">Today's training</h2>
@@ -483,7 +483,7 @@ const today=new Date(); const todayISO=iso(today);
 const DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const fmtDay=s=>{const d=new Date(s+'T12:00:00');return DOW[d.getDay()]+' '+d.getDate()+' '+d.toLocaleString('en',{month:'short'})};
 const daysTo=s=>Math.ceil((new Date(s+'T07:00:00')-today)/864e5);
-$('#cd-half').textContent=daysTo('2026-12-13'); $('#cd-mcm').textContent=daysTo('2027-10-31');
+
 
 /* ---------- routing ---------- */
 const VIEWS=['today','week','trends','goals'];
@@ -495,7 +495,7 @@ window.addEventListener('hashchange',()=>show(location.hash.slice(1)));
 show(location.hash.slice(1));
 
 /* ---------- state ---------- */
-const S={pmc:null,plan:null,weekly:[],summary:null,goals:null,report:null,checkins:{},requests:[]};
+const S={profile:null,pmc:null,plan:null,weekly:[],summary:null,goals:null,report:null,checkins:{},requests:[]};
 let db=null, canWrite=true;
 
 /* ---------- workouts ---------- */
@@ -724,7 +724,7 @@ function drawPMC(){const host=$('#ch-pmc');if(!host||!S.pmc||!S.pmc.days)return;
   svg.append(svgEl('path',{d:path('ctl'),fill:'none',stroke:css('--bike'),'stroke-width':2.5}));
   svg.append(svgEl('circle',{cx:x(rows.length-1),cy:y(last.ctl),r:4,fill:css('--bike')}));
   const step=Math.ceil(rows.length/6);rows.forEach((r,i)=>{if(i%step===0){const d=new Date(r.d+'T12:00:00');const tx=svgEl('text',{x:x(i),y:H-6,'text-anchor':'middle'});tx.textContent=d.getDate()+' '+d.toLocaleString('en',{month:'short'});svg.append(tx)}});
-  [['2025-12-07','70.3'],['2026-10-11','Chicago']].forEach(([d,l])=>{const i=rows.findIndex(r=>r.d===d);if(i<0)return;svg.append(svgEl('line',{x1:x(i),x2:x(i),y1:m.t,y2:m.t+ih,stroke:css('--muted'),'stroke-dasharray':'3 3'}));const tx=svgEl('text',{x:x(i)+3,y:m.t+10});tx.textContent=l;svg.append(tx)});
+  ((S.profile&&S.profile.pastRaces)||[]).map(x=>[x.date,x.label]).forEach(([d,l])=>{const i=rows.findIndex(r=>r.d===d);if(i<0)return;svg.append(svgEl('line',{x1:x(i),x2:x(i),y1:m.t,y2:m.t+ih,stroke:css('--muted'),'stroke-dasharray':'3 3'}));const tx=svgEl('text',{x:x(i)+3,y:m.t+10});tx.textContent=l;svg.append(tx)});
   const tip=el('div','tip');tip.hidden=true;const hit=svgEl('rect',{x:m.l,y:m.t,width:iw,height:ih,fill:'transparent'});svg.append(hit);
   const mv=ev=>{const rect=svg.getBoundingClientRect();const sx=(ev.clientX-rect.left)*(W/rect.width);const i=Math.max(0,Math.min(rows.length-1,Math.round((sx-m.l)/iw*(rows.length-1))));const r=rows[i];
     tip.textContent=fmtDay(r.d)+' · Fitness '+Math.round(r.ctl)+' · Fatigue '+Math.round(r.atl)+' · Form '+Math.round(r.tsb)+(r.load?' · load '+r.load:'');tip.hidden=false;tip.style.left=Math.max(110,Math.min(rect.width-110,x(i)/W*rect.width))+'px';tip.style.top=(y(r.ctl)/H*rect.height)+'px'};
@@ -815,12 +815,13 @@ function renderStrip(){const box=$('#wstrip');box.replaceChildren();if(!S.plan)r
     const dots=el('span','dots');(d.items||[]).slice(0,3).forEach(w=>{const k=kindOf(w);const i2=el('i');i2.style.background='var(--'+({'k-run':'run','k-q':'lane','k-bike':'bike','k-gym':'gym','k-test':'test'}[k.c])+')';dots.append(i2)});b.append(dots);
     b.setAttribute('aria-label',fmtDay(d.date)+': '+((d.items||[]).map(w=>w.title).join(', ')||'rest'));
     b.addEventListener('click',()=>openDay(d.date));box.append(b)})}
-function renderGreet(){const h=today.getHours();$('#g-hello').textContent=(h<12?'Good morning':h<19?'Good afternoon':'Good evening')+', Fonsi';
+function renderGreet(){const h=today.getHours();$('#g-hello').textContent=(h<12?'Good morning':h<19?'Good afternoon':'Good evening')+(S.profile&&S.profile.name?', '+S.profile.name:'');
+  if(S.profile&&S.profile.name){const bn=$('#brand');if(bn&&bn.firstChild&&bn.firstChild.nodeType===3)bn.firstChild.textContent=S.profile.name+' Coach'}
   $('#g-date').textContent=today.toLocaleDateString('en',{weekday:'long',day:'numeric',month:'long'});
   $('#g-phase').textContent=S.plan?(S.plan.phase||'')+(S.plan.plannedKm?' · '+S.plan.plannedKm+' km planned this week':''):'';
   const f=S.summary&&S.summary.focus;$('#coach-card').hidden=!f;if(f)$('#coach-focus').textContent=f;
   const r=$('#races-today');r.replaceChildren();
-  [['2026-12-13',"Rock 'n' Roll Half",'Goal 1:29:59',true],['2027-10-31','Marine Corps Marathon','Goal 2:50',false]].forEach(([d,nm,tg,main])=>{const c=el('div','race'+(main?' main':''));
+  ((S.profile&&S.profile.races)||[]).filter(x=>daysTo(x.date)>=0).slice(0,2).map((x,i)=>[x.date,x.name,x.goal?'Goal '+x.goal:'',i===0]).forEach(([d,nm,tg,main])=>{const c=el('div','race'+(main?' main':''));
     c.append(el('span','d',String(daysTo(d))),el('span','u','days to go'),el('span','nm',nm),el('span','tg',tg));r.append(c)})}
 function renderWkHead(){const box=$('#wkhead');box.replaceChildren();if(!S.plan)return;
   let nD=0,nA=0,mP=0,mD=0;(S.plan.days||[]).forEach(d=>(d.items||[]).forEach(w=>{const e=eff(w,d.date);const m=minsOf(w)||0;
@@ -855,7 +856,7 @@ async function putJSON(path,obj,msg){
   if(!r.ok){const e=new Error('http '+r.status);e.status=r.status;throw e}
   const j=await r.json();SHA[path]=j.content.sha;return j}
 async function listDir(dir,n){const l=await api(dir);if(!Array.isArray(l))return [];return l.filter(f=>f.name.endsWith('.json')).sort((x,y)=>y.name.localeCompare(x.name)).slice(0,n)}
-function saveCache(){LS.set('fc_cache',{pmc:S.pmc,plan:S.plan,weekly:S.weekly,summary:S.summary,goals:S.goals,report:S.report,checkins:S.checkins,requests:S.requests})}
+function saveCache(){LS.set('fc_cache',{profile:S.profile,pmc:S.pmc,plan:S.plan,weekly:S.weekly,summary:S.summary,goals:S.goals,report:S.report,checkins:S.checkins,requests:S.requests})}
 const cached=LS.get('fc_cache');
 if(cached){Object.assign(S,cached);renderAll()}
 let loading=false, lastWrite=0;
@@ -863,7 +864,7 @@ async function loadAll(){
   if(!CFG||!CFG.token){openSetup();return}
   if(loading)return;loading=true;
   try{
-    const [plan,weekly,summary,goals,report,pmc]=await Promise.all(['plan','weekly','summary','goals','report','pmc'].map(k=>getJSON('coach/'+k+'.json')));if(pmc)S.pmc=pmc;
+    const [plan,weekly,summary,goals,report,pmc,profile]=await Promise.all(['plan','weekly','summary','goals','report','pmc','profile'].map(k=>getJSON('coach/'+k+'.json')));if(pmc)S.pmc=pmc;if(profile)S.profile=profile;
     if(plan)S.plan=plan;if(weekly)S.weekly=weekly.rows||[];if(summary)S.summary=summary;if(goals)S.goals=goals;if(report)S.report=report;
     if(Date.now()-lastWrite>20000){
       const [ci,rq]=await Promise.all([listDir('checkins',14),listDir('requests',30)]);
