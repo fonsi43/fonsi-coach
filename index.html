@@ -320,6 +320,37 @@ header.top .count{display:none}
 .pv-r b{font-weight:600}
 .t-green{color:var(--c-green)} .t-yellow{color:color-mix(in srgb,var(--c-yellow) 75%,var(--ink))} .t-orange{color:var(--c-orange)} .t-red{color:var(--c-red)}
 .pv-score{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:10px 12px;border-top:1px solid var(--line);font-size:13px}
+
+/* ===== gestures & motion ===== */
+html.sheet-on body{overflow:hidden}
+body{overscroll-behavior-y:none}
+.sheet{background:rgba(0,0,0,calc(.42 * var(--dim,1)));transition:background .28s ease}
+.sheet:not(.open){background:rgba(0,0,0,0)}
+.sheet .panel{transform:translateY(105%);transition:transform .38s cubic-bezier(.2,.9,.25,1);will-change:transform;max-height:92vh;overflow-y:auto;overscroll-behavior:contain}
+.sheet.open .panel{transform:translateY(0)}
+.grabber{width:38px;height:5px;border-radius:3px;background:var(--line);margin:-8px auto 2px;flex:none}
+.ds-top{gap:6px}
+.ds-top h3{flex:1;text-align:center}
+.navbtn{background:var(--surface2);border:1px solid var(--line);color:var(--ink);width:34px;height:34px;border-radius:50%;font-size:20px;line-height:1;display:grid;place-items:center;padding:0}
+.view.enter{animation:viewin .26s cubic-bezier(.2,.8,.2,1)}
+@keyframes viewin{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+button,.wd,.dcell,.chip,.tab,.race{transition:transform .12s ease,background-color .2s,box-shadow .2s;-webkit-user-select:none;user-select:none}
+button:active,.wd:active,.dcell:active,.chip:active,.race:active{transform:scale(.96)}
+.tab:active{transform:scale(.9)}
+.swipe{position:relative;border-radius:22px}
+.swipe-bg{position:absolute;inset:0;border-radius:22px;display:flex;justify-content:space-between;align-items:center;padding:0 22px;font-weight:700;font-size:15px;color:#fff;background:var(--surface2);overflow:hidden}
+.swipe[data-dir="l"] .swipe-bg{background:var(--c-green)} .swipe[data-dir="r"] .swipe-bg{background:var(--bike)}
+.swipe[data-dir="l"] .sw-r,.swipe[data-dir="r"] .sw-l{visibility:hidden}
+.swipe .sw-l,.swipe .sw-r{transition:transform .2s cubic-bezier(.2,.8,.2,1)}
+.swipe.go-l .sw-l,.swipe.go-r .sw-r{transform:scale(1.18)}
+.swipe-card{position:relative;transition:transform .32s cubic-bezier(.2,.9,.25,1);touch-action:pan-y}
+.toast{position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:14px;font-weight:600;z-index:40;pointer-events:none;transition:opacity .2s,transform .3s cubic-bezier(.2,.9,.25,1)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.ptr{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) - 30px);width:30px;height:30px;border-radius:50%;background:var(--surface);box-shadow:var(--shadow);border:1px solid var(--line);z-index:30;opacity:0;transform:translate(-50%,0);transition:transform .3s,opacity .3s;display:grid;place-items:center}
+.ptr i{width:14px;height:14px;border-radius:50%;border:2px solid var(--accent);border-top-color:transparent}
+.ptr.spin i{animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion: reduce){.sheet .panel,.swipe-card,.view.enter,.toast{transition:none!important;animation:none!important}}
 </style>
 </head>
 <body>
@@ -452,7 +483,7 @@ header.top .count{display:none}
 
 <div class="sheet" id="daysheet" hidden>
   <div class="panel daypanel" role="dialog" aria-modal="true" aria-labelledby="ds-h">
-    <div class="ds-top"><h3 id="ds-h">Day</h3><button class="chip" id="ds-close" type="button">Close</button></div>
+    <div class="ds-top"><button class="navbtn" id="ds-prev" type="button" aria-label="Previous day">‹</button><h3 id="ds-h">Day</h3><button class="navbtn" id="ds-next" type="button" aria-label="Next day">›</button><button class="chip" id="ds-close" type="button">Done</button></div>
     <div id="ds-body" class="ds-body"></div>
   </div>
 </div>
@@ -494,7 +525,7 @@ const daysTo=s=>Math.ceil((new Date(s+'T07:00:00')-today)/864e5);
 
 /* ---------- routing ---------- */
 const VIEWS=['today','week','trends','goals'];
-function show(v){ if(!VIEWS.includes(v))v='today';
+function show(v){ if(!VIEWS.includes(v))v='today'; const nv=document.getElementById('v-'+v); if(nv&&nv.hidden){nv.classList.remove('enter');void nv.offsetWidth;nv.classList.add('enter')}
   VIEWS.forEach(x=>{$('#v-'+x).hidden=x!==v}); $$('.tab').forEach(t=>t.setAttribute('aria-current',t.dataset.v===v?'page':'false'));
   if(v==='trends')drawTrends(); window.scrollTo(0,0);}
 $$('.tab').forEach(t=>t.addEventListener('click',()=>{ if(location.hash!=='#'+t.dataset.v) location.hash=t.dataset.v; else show(t.dataset.v);}));
@@ -586,13 +617,13 @@ function renderToday(){
 function dayState(d){const its=(d.items||[]).filter(w=>w.status!=='optional');if(!its.length)return (d.items||[]).length?'todo':'rest';
   const es=its.map(w=>eff(w,d.date));if(es.includes('missed'))return 'missed';if(es.every(x=>x==='done'))return 'done';return 'todo'}
 let openDayDate=null;
-function openDay(date){openDayDate=date;renderDaySheet();$('#daysheet').hidden=false}
+function openDay(date){openDayDate=date;renderDaySheet();openSheetEl('daysheet')}
 function renderDaySheet(){if(!openDayDate||!S.plan)return;const d=(S.plan.days||[]).find(x=>x.date===openDayDate);if(!d)return;
   $('#ds-h').textContent=fmtDay(d.date)+(d.date===todayISO?' · today':'');const body=$('#ds-body');body.replaceChildren();
   if(!d.items||!d.items.length){body.append(el('p','empty','Rest day. Walk, stretch, sleep well.'));return}
   d.items.forEach(w=>body.append(heroNode(w,d.date)))}
-$('#ds-close').addEventListener('click',()=>{$('#daysheet').hidden=true;openDayDate=null});
-$('#daysheet').addEventListener('click',e=>{if(e.target.id==='daysheet'){$('#daysheet').hidden=true;openDayDate=null}});
+$('#ds-close').addEventListener('click',()=>closeSheetEl('daysheet'));
+$('#daysheet').addEventListener('click',e=>{if(e.target.id==='daysheet')closeSheetEl('daysheet')});
 function renderWeek(){
   const box=$('#week-list'); box.replaceChildren();
   if(!S.plan){box.append(el('p','empty','No plan loaded yet.'));return}
@@ -623,9 +654,9 @@ const REQLABEL={move:'moved to next day',skip:'skipped',easier:'make easier',not
 let sheetCtx=null;
 function openSheet(w,date,kind){sheetCtx={w,date,kind};$('#sheet-h').textContent={move:'Move to tomorrow',skip:'Skip this workout',easier:'Make it easier',note:'Note on this workout'}[kind];
   $('#sheet-ok').textContent={move:'Move it',skip:'Skip it',easier:'Make it easier',note:'Send note'}[kind];
-  $('#sheet-wo').textContent=fmtDay(date)+' · '+w.title;$('#sheet-note').value='';$('#sheet').hidden=false;setTimeout(()=>$('#sheet-note').focus(),50)}
-$('#sheet-cancel').addEventListener('click',()=>{$('#sheet').hidden=true});
-$('#sheet').addEventListener('click',e=>{if(e.target.id==='sheet')$('#sheet').hidden=true});
+  $('#sheet-wo').textContent=fmtDay(date)+' · '+w.title;$('#sheet-note').value='';openSheetEl('sheet')}
+$('#sheet-cancel').addEventListener('click',()=>closeSheetEl('sheet'));
+$('#sheet').addEventListener('click',e=>{if(e.target.id==='sheet')closeSheetEl('sheet')});
 function addDays(iso0,n){const d=new Date(iso0+'T12:00:00');d.setDate(d.getDate()+n);return iso(d)}
 async function applyChange(w,date,kind,note){
   const plan=JSON.parse(JSON.stringify(S.plan));const day=plan.days.find(d=>d.date===date);const idx=day?day.items.findIndex(x=>x.id===w.id):-1;
@@ -639,7 +670,7 @@ async function applyChange(w,date,kind,note){
   await db.collection('requests').add(doc)}
 $('#sheet-ok').addEventListener('click',async()=>{
   if(!sheetCtx)return; const {w,date,kind}=sheetCtx; const btn=$('#sheet-ok'); btn.disabled=true;
-  try{ if(!db) throw new Error('offline'); await applyChange(w,date,kind,$('#sheet-note').value.trim()); $('#sheet').hidden=true; }
+  try{ if(!db) throw new Error('offline'); await applyChange(w,date,kind,$('#sheet-note').value.trim()); closeSheetEl('sheet'); toast({move:'Moved to tomorrow',skip:'Skipped',easier:'Easier version on its way',note:'Note sent'}[kind]); }
   catch(e){ $('#sheet-wo').textContent=e&&e.message==='lastday'?'This is the last day of the week. Skip it instead, or add a note and I’ll fit it into next week.':'Not saved: no connection. Try again.'; }
   btn.disabled=false;
 });
@@ -843,7 +874,7 @@ function heroNode(w,date){const k=kindOf(w);const n=el('article','hero '+k.c);
   if(w.result)n.append(el('div','res',w.result));
   const lg=logNode(w,date);if(lg)n.append(lg);
   const ac=actionsNode(w,date);if(ac)n.append(ac);
-  return n}
+  return swipeWrap(n,w,date)}
 function renderStrip(){const box=$('#wstrip');box.replaceChildren();if(!S.plan)return;
   const L=['M','T','W','T','F','S','S'];
   (S.plan.days||[]).forEach((d,i)=>{const stt=dayState(d);const b=el('button','wd '+stt+(d.date===todayISO?' today':'')+(dayComp(d)?' wc-'+dayComp(d):''));b.type='button';
@@ -869,6 +900,61 @@ function renderWkHead(){const box=$('#wkhead');box.replaceChildren();if(!S.plan)
   row('Training time',mD,mP,'≈'+fmtHM(mD)+' / '+fmtHM(mP),'var(--accent)');
   row('Running',km,pk,km+' / '+(pk||'—')+' km','var(--run)');
   box.append(info)}
+
+
+/* ---------- gestures & motion (iOS-style) ---------- */
+const REDUCE=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const SHEET_STACK=[];
+function openSheetEl(id){const sh=$('#'+id);if(!sh)return;if(!sh.hidden&&sh.classList.contains('open'))return;sh.hidden=false;const p=sh.querySelector('.panel');p.style.transform='';sh.style.removeProperty('--dim');
+  if(!SHEET_STACK.includes(id))SHEET_STACK.push(id);requestAnimationFrame(()=>requestAnimationFrame(()=>sh.classList.add('open')));document.documentElement.classList.add('sheet-on')}
+function closeSheetEl(id){const sh=$('#'+id);if(!sh||sh.hidden)return;sh.classList.remove('open');const p=sh.querySelector('.panel');p.style.transition='';p.style.transform='';sh.style.removeProperty('--dim');
+  const i=SHEET_STACK.indexOf(id);if(i>=0)SHEET_STACK.splice(i,1);if(id==='daysheet')openDayDate=null;
+  setTimeout(()=>{if(!sh.classList.contains('open'))sh.hidden=true;if(!SHEET_STACK.length)document.documentElement.classList.remove('sheet-on')},REDUCE?0:320)}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&SHEET_STACK.length)closeSheetEl(SHEET_STACK[SHEET_STACK.length-1])});
+function toast(t){if(!t)return;let el2=$('#toast');if(!el2){el2=el('div','toast');el2.id='toast';el2.setAttribute('role','status');document.body.append(el2)}el2.textContent=t;el2.classList.add('show');clearTimeout(el2._t);el2._t=setTimeout(()=>el2.classList.remove('show'),1800)}
+/* drag a sheet down to close it */
+function bindSheetDrag(sh){const p=sh.querySelector('.panel');if(!p||p._drag)return;p._drag=1;
+  if(!p.querySelector('.grabber')){const g=el('div','grabber');g.setAttribute('aria-hidden','true');p.prepend(g)}
+  let y0=0,x0=0,t0=0,dy=0,on=false,dec=false;
+  p.addEventListener('touchstart',e=>{if(e.touches.length!==1)return;const tg=e.target;if(tg.closest('textarea,input,.scale'))return;y0=e.touches[0].clientY;x0=e.touches[0].clientX;t0=performance.now();dy=0;dec=false;on=false},{passive:true});
+  p.addEventListener('touchmove',e=>{const y=e.touches[0].clientY,x=e.touches[0].clientX;const ddy=y-y0,ddx=x-x0;
+    if(!dec){if(Math.abs(ddy)<8&&Math.abs(ddx)<8)return;dec=true;on=ddy>0&&Math.abs(ddy)>Math.abs(ddx)&&p.scrollTop<=0&&!e.target.closest('.swipe-card')}
+    if(!on)return;e.preventDefault();dy=Math.max(0,ddy);p.style.transition='none';p.style.transform='translateY('+dy+'px)';sh.style.setProperty('--dim',String(Math.max(0,1-dy/400)))},{passive:false});
+  p.addEventListener('touchend',()=>{if(!on)return;on=false;const v=dy/Math.max(1,performance.now()-t0);p.style.transition='';
+    if(dy>110||v>0.6){p.style.transform='translateY(110%)';closeSheetEl(sh.id)}else{p.style.transform='';sh.style.removeProperty('--dim')}});}
+document.querySelectorAll('.sheet').forEach(bindSheetDrag);
+/* swipe between days in the day sheet */
+function dayShift(n){if(!S.plan||!openDayDate)return;const ds=S.plan.days.map(d=>d.date);const i=ds.indexOf(openDayDate)+n;if(i<0||i>=ds.length)return;
+  const body=$('#ds-body');openDayDate=ds[i];if(REDUCE){renderDaySheet();return}
+  body.style.transition='transform .16s ease,opacity .16s ease';body.style.transform='translateX('+(n>0?-40:40)+'px)';body.style.opacity='0';
+  setTimeout(()=>{renderDaySheet();body.style.transition='none';body.style.transform='translateX('+(n>0?40:-40)+'px)';requestAnimationFrame(()=>{body.style.transition='transform .22s cubic-bezier(.2,.8,.2,1),opacity .22s';body.style.transform='';body.style.opacity='1'})},160)}
+$('#ds-prev').addEventListener('click',()=>dayShift(-1));$('#ds-next').addEventListener('click',()=>dayShift(1));
+(function(){const p=$('#daysheet .panel');let x0=0,y0=0,dec=false,hz=false;
+  p.addEventListener('touchstart',e=>{if(e.target.closest('.swipe-card,textarea,input,.scale'))return x0=null;x0=e.touches[0].clientX;y0=e.touches[0].clientY;dec=false;hz=false},{passive:true});
+  p.addEventListener('touchmove',e=>{if(x0==null)return;const dx=e.touches[0].clientX-x0,dy=e.touches[0].clientY-y0;if(!dec&&(Math.abs(dx)>10||Math.abs(dy)>10)){dec=true;hz=Math.abs(dx)>Math.abs(dy)*1.3}},{passive:true});
+  p.addEventListener('touchend',e=>{if(x0==null||!hz)return;const dx=e.changedTouches[0].clientX-x0;if(Math.abs(dx)>60)dayShift(dx<0?1:-1)})})();
+/* swipe a workout card: right = done, left = move */
+function swipeWrap(card,w,date){const wrap=el('div','swipe');const bg=el('div','swipe-bg');const L=el('span','sw-l','✓  Done');const R=el('span','sw-r','Move  →');bg.append(L,R);wrap.append(bg,card);card.classList.add('swipe-card');
+  const e0=eff(w,date);const canDone=canWrite&&date<=todayISO&&e0!=='done'&&!logOf(date,w.id)&&!LOGUI[w.id]&&w.status!=='skipped';
+  const last=S.plan&&S.plan.days[S.plan.days.length-1].date===date;const canMove=!!actionsNode(w,date);
+  if(last)R.textContent='Skip  →';if(!canDone)L.textContent='';if(!canMove)R.textContent='';
+  let x0=0,y0=0,dx=0,dec=false,hz=false;
+  card.addEventListener('touchstart',e=>{if(e.target.closest('button,textarea,input'))return x0=null;x0=e.touches[0].clientX;y0=e.touches[0].clientY;dx=0;dec=false;hz=false},{passive:true});
+  card.addEventListener('touchmove',e=>{if(x0==null)return;const ddx=e.touches[0].clientX-x0,ddy=e.touches[0].clientY-y0;
+    if(!dec){if(Math.abs(ddx)<10&&Math.abs(ddy)<10)return;dec=true;hz=Math.abs(ddx)>Math.abs(ddy)*1.3}
+    if(!hz)return;e.preventDefault();e.stopPropagation();dx=ddx;const ok=(dx>0&&canDone)||(dx<0&&canMove);const d=ok?dx:dx*0.2;
+    card.style.transition='none';card.style.transform='translateX('+d+'px)';wrap.classList.toggle('go-l',dx>0&&canDone&&dx>90);wrap.classList.toggle('go-r',dx<0&&canMove&&dx<-90);wrap.dataset.dir=dx>0?'l':'r'},{passive:false});
+  card.addEventListener('touchend',()=>{if(x0==null||!hz)return;card.style.transition='';card.style.transform='';wrap.classList.remove('go-l','go-r');
+    if(dx>90&&canDone){LOGUI[w.id]='rpe';renderAll();toast('Nice. How did it feel?')}
+    else if(dx<-90&&canMove){openSheet(w,date,last?'skip':'move')}});
+  return wrap}
+/* pull down to refresh */
+(function(){const ind=el('div','ptr');ind.setAttribute('aria-hidden','true');ind.append(el('i'));document.body.append(ind);let y0=null,dy=0,armed=false;
+  window.addEventListener('touchstart',e=>{if(SHEET_STACK.length||window.scrollY>0||e.touches.length!==1)return y0=null;y0=e.touches[0].clientY;dy=0;armed=false},{passive:true});
+  window.addEventListener('touchmove',e=>{if(y0==null)return;dy=e.touches[0].clientY-y0;if(dy<=0){ind.style.transform='';return}const h=Math.min(dy*0.45,80);ind.style.transition='none';ind.style.transform='translate(-50%,'+h+'px) rotate('+(dy*2)+'deg)';ind.style.opacity=String(Math.min(1,dy/90));armed=dy>110},{passive:true});
+  window.addEventListener('touchend',async()=>{if(y0==null)return;y0=null;ind.style.transition='';if(!armed){ind.style.transform='';ind.style.opacity='0';return}
+    ind.classList.add('spin');ind.style.transform='translate(-50%,56px)';try{if(window.__refresh)await window.__refresh();else renderAll()}catch(e){}
+    setTimeout(()=>{ind.classList.remove('spin');ind.style.transform='';ind.style.opacity='0';toast('Up to date')},350)})})();
 
 function renderAll(){renderGreet();renderStrip();renderWkHead();renderToday();renderWeek();renderReqs();renderStreak();renderGoals();loadCheckinForm();drawTrends()}
 renderAll();
@@ -897,7 +983,7 @@ const cached=LS.get('fc_cache');
 if(cached){Object.assign(S,cached);renderAll()}
 let loading=false, lastWrite=0;
 async function loadAll(){
-  if(!CFG||!CFG.token){openSetup();return}
+  if(!CFG||!CFG.token){setTimeout(openSetup,50);return}
   if(loading)return;loading=true;
   try{
     if(Date.now()-lastWrite<20000){loading=false;return}
@@ -915,17 +1001,18 @@ db={
   doc:p=>({set:async o=>{lastWrite=Date.now();await putJSON(p+'.json',o,'check-in '+(o.date||''));saveCache()}}),
   collection:c=>({add:async o=>{lastWrite=Date.now();const id=new Date().toISOString().replace(/[:.]/g,'-')+'-'+Math.random().toString(36).slice(2,6);await putJSON(c+'/'+id+'.json',o,'request: '+(o.kind||''));if(c==='requests'){S.requests.unshift(Object.assign({id:id+'.json'},o));saveCache();renderAll()}}})
 };
-function openSetup(){const c=CFG||{};$('#cfg-owner').value=c.owner||'';$('#cfg-repo').value=c.repo||'fonsi-coach-data';$('#cfg-token').value=c.token?'••••••••':'';$('#cfg-status').textContent='';$('#setup').hidden=false}
+function openSetup(){const c=CFG||{};$('#cfg-owner').value=c.owner||'';$('#cfg-repo').value=c.repo||'fonsi-coach-data';$('#cfg-token').value=c.token?'••••••••':'';$('#cfg-status').textContent='';openSheetEl('setup')}
 $('#gear').addEventListener('click',openSetup);
-$('#cfg-cancel').addEventListener('click',()=>{$('#setup').hidden=true});
-$('#cfg-refresh').addEventListener('click',()=>{$('#setup').hidden=true;lastWrite=0;loadAll()});
+window.__refresh=()=>{lastWrite=0;return loadAll()};
+$('#cfg-cancel').addEventListener('click',()=>closeSheetEl('setup'));
+$('#cfg-refresh').addEventListener('click',()=>{closeSheetEl('setup');lastWrite=0;loadAll()});
 $('#cfg-save').addEventListener('click',async()=>{
   const st=$('#cfg-status');const tok=$('#cfg-token').value.trim();
   const n={owner:$('#cfg-owner').value.trim(),repo:$('#cfg-repo').value.trim()||'fonsi-coach-data',token:tok.startsWith('••')&&CFG?CFG.token:tok};
   if(!n.owner||!n.token){st.className='status err';st.textContent='Fill in your username and access key.';return}
   st.className='status';st.textContent='Checking…';const old=CFG;CFG=n;
   try{const r=await fetch('https://api.github.com/repos/'+n.owner+'/'+n.repo,{headers:{'Authorization':'Bearer '+n.token,'Accept':'application/vnd.github+json'}});
-    if(!r.ok)throw new Error(r.status);LS.set('fc_cfg',n);st.className='status ok';st.textContent='Connected.';setTimeout(()=>{$('#setup').hidden=true},600);loadAll()}
+    if(!r.ok)throw new Error(r.status);LS.set('fc_cfg',n);st.className='status ok';st.textContent='Connected.';setTimeout(()=>closeSheetEl('setup'),600);loadAll()}
   catch(e){CFG=old;st.className='status err';st.textContent=String(e.message)==='404'?'Repository not found. Check the name and that the key covers it.':'Key refused. Make sure it has Contents read and write on that repository.'}
 });
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')loadAll()});
