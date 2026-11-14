@@ -351,13 +351,6 @@ button:active,.wd:active,.dcell:active,.chip:active,.race:active{transform:scale
 .ptr.spin i{animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion: reduce){.sheet .panel,.swipe-card,.view.enter,.toast{transition:none!important;animation:none!important}}
-.daypick{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:8px}
-.dp{background:var(--surface2);border:1.5px solid var(--line);border-radius:14px;padding:8px 4px;display:flex;flex-direction:column;align-items:center;gap:2px;color:var(--ink)}
-.dp-l{font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
-.dp-n{font-family:var(--display);font-size:22px;font-weight:700;line-height:1.1}
-.dp-s{font-size:10.5px;color:var(--muted)}
-.dp[aria-checked="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
-.dp[aria-checked="true"] .dp-l,.dp[aria-checked="true"] .dp-s{color:var(--accent-ink);opacity:.85}
 </style>
 </head>
 <body>
@@ -453,6 +446,10 @@ button:active,.wd:active,.dcell:active,.chip:active,.race:active{transform:scale
       <h2>Running km per week</h2>
       <div class="card"><div class="legend"><span><i style="background:var(--accent)"></i>Actual</span><span><i style="background:var(--lane)"></i>Planned</span></div><div class="chart" id="ch-km"></div></div>
     </div>
+    <div class="sec" id="c-srpe">
+      <h2>How hard the week felt</h2>
+      <div class="card"><div class="explain"><p>Session-RPE load: for each session you rate, <b>RPE × minutes</b>, added up for the week. It measures the load from how it felt, not from the watch.</p><p class="small muted">Compare it with the fitness chart: when this climbs faster than your km, the training is costing you more than usual.</p></div><div class="chart" id="ch-srpe"></div></div>
+    </div>
     <div class="sec" id="c-easy">
       <h2>How much of your running was easy</h2>
       <div class="card"><div class="explain"><p>Of all the minutes you ran each week, how many were <b>truly easy</b> (heart rate under about 152)?</p><p class="small muted">Good marathon training is about 75–80% easy (the green band). Easy running builds the engine; too many medium-hard runs leave you tired without the benefit. Before Chicago you were often near 20–30%.</p></div><div class="chart" id="ch-easy"></div></div>
@@ -472,6 +469,10 @@ button:active,.wd:active,.dcell:active,.chip:active,.race:active{transform:scale
     <div class="sec" id="report-sec">
       <h2>Latest coach report</h2>
       <div class="card report" id="report"><p class="empty">The Sunday report appears here.</p></div>
+    </div>
+    <div class="sec" id="staff-sec">
+      <h2>Coaching staff meeting</h2>
+      <div class="card report" id="staff"><p class="empty">Each Sunday, four reviewers challenge next week's plan before it reaches your watch. Their debate appears here.</p></div>
     </div>
     <div class="sec"><h2>Race targets</h2><div class="tiles" id="races"></div></div>
     <div class="sec"><h2>Checkpoints</h2><div class="card tablewrap"><table id="checkpoints"><thead><tr><th>When</th><th>Test</th><th>On track</th><th>Retarget if</th><th>Result</th></tr></thead><tbody></tbody></table></div></div>
@@ -541,7 +542,7 @@ window.addEventListener('hashchange',()=>show(location.hash.slice(1)));
 show(location.hash.slice(1));
 
 /* ---------- state ---------- */
-const S={profile:null,pmc:null,plan:null,weekly:[],summary:null,goals:null,report:null,checkins:{},requests:[]};
+const S={profile:null,pmc:null,plan:null,weekly:[],summary:null,goals:null,report:null,staff:null,checkins:{},requests:[]};
 let db=null, canWrite=true;
 
 /* ---------- workouts ---------- */
@@ -809,6 +810,7 @@ function drawTrends(){ if($('#v-trends').hidden||!S.weekly.length)return; drawPM
   const ef=[...S.weekly].reverse().find(r=>r.ef!=null&&r.week<=todayISO); tile(t,'Efficiency',ef?ef.ef.toFixed(2):'—','was 1.17–1.25 all summer');
   if(S.summary&&S.summary.intensityScore!=null) tile(t,'Intensity score',S.summary.intensityScore+'/10',S.summary.intensityNote||'');
   chart($('#ch-km'),rows,{label:'Weekly running km',series:[{key:'km',name:'Actual',type:'bar',color:'--accent',unit:' km'},{key:'plannedKm',name:'Planned',color:'--lane',dash:true,unit:' km'}],min:0,ticks:[0,20,40,60]});
+  chart($('#ch-srpe'),rows,{label:'Session-RPE load per week',series:[{key:'srpe',name:'sRPE load',type:'bar',color:'--gym',unit:' AU'}],min:0});
   chart($('#ch-easy'),rows,{label:'Easy running',series:[{key:'easyPct',name:'Easy minutes',color:'--accent',unit:'%'}],min:0,max:100,ticks:[0,50,75,100],band:[75,80]});
   chart($('#ch-ef'),rows,{label:'Efficiency factor',series:[{key:'ef',name:'EF',color:'--info'}],pad:true,fmt:v=>(+v).toFixed(2)});
   chart($('#ch-hr'),rows,{label:'Median easy HR',series:[{key:'easyHR',name:'HR',color:'--lane',unit:' bpm'}],min:120,max:170,ticks:[120,140,152,170],band:[140,152]});
@@ -831,7 +833,17 @@ function renderGoals(){
     if(S.report.headline){const p=el('p','',S.report.headline);p.style.cssText='font-weight:600;margin:6px 0';rp.append(p)}
     const add=(h,list)=>{if(!list||!list.length)return;rp.append(el('div','small muted',h));const ul=el('ul');list.forEach(x=>ul.append(el('li','',x)));ul.style.marginBottom='8px';rp.append(ul)};
     add('What happened',S.report.happened);add('What changes and why',S.report.changes);add('Your to-dos',S.report.todo);}
+  renderStaff();
 }
+function renderStaff(){const box=$('#staff');const st=S.staff;if(!box||!st)return;box.replaceChildren();
+  box.append(el('div','small muted',(st.date?fmtDay(st.date):'')+(st.weekStart?' · plan for week of '+fmtDay(st.weekStart):'')));
+  if(st.summary){const p=el('p','',st.summary);p.style.cssText='font-weight:600;margin:6px 0';box.append(p)}
+  if(st.ruleCheck&&st.ruleCheck.length){box.append(el('div','small muted','Rule check'));const ul=el('ul');st.ruleCheck.forEach(x=>ul.append(el('li','',x)));ul.style.marginBottom='8px';box.append(ul)}
+  (st.critics||[]).forEach(c=>{const h=el('div','small muted',(c.name||'Critic')+(c.verdict?' · '+c.verdict:''));h.style.marginTop='6px';box.append(h);
+    const ul=el('ul');(c.issues||[]).forEach(i=>{const li=el('li');const b=el('b','',(i.severity?'['+i.severity+'] ':'')+(i.issue||''));li.append(b);
+      const d=(i.decision||'');const tx=(i.change?' → '+i.change:'')+(d?' · '+(d==='applied'?'Applied':d==='rejected'?'Overruled':d):'')+(i.why?': '+i.why:'');
+      const s=el('span','',tx);if(d==='applied')s.style.color='var(--good)';else if(d==='rejected')s.style.color='var(--muted)';li.append(s);ul.append(li)});
+    if(!(c.issues||[]).length)ul.append(el('li','muted','No issues.'));ul.style.marginBottom='6px';box.append(ul)})}
 
 /* ---------- v4 helpers ---------- */
 function kindOf(w){const t=(w.title||'')+' ';
@@ -998,7 +1010,7 @@ async function putJSON(path,obj,msg){
   if(!r.ok){const e=new Error('http '+r.status);e.status=r.status;throw e}
   const j=await r.json();SHA[path]=j.content.sha;return j}
 async function listDir(dir,n){const l=await api(dir);if(!Array.isArray(l))return [];return l.filter(f=>f.name.endsWith('.json')).sort((x,y)=>y.name.localeCompare(x.name)).slice(0,n)}
-function saveCache(){LS.set('fc_cache',{profile:S.profile,pmc:S.pmc,plan:S.plan,weekly:S.weekly,summary:S.summary,goals:S.goals,report:S.report,checkins:S.checkins,requests:S.requests})}
+function saveCache(){LS.set('fc_cache',{staff:S.staff,profile:S.profile,pmc:S.pmc,plan:S.plan,weekly:S.weekly,summary:S.summary,goals:S.goals,report:S.report,checkins:S.checkins,requests:S.requests})}
 const cached=LS.get('fc_cache');
 if(cached){Object.assign(S,cached);renderAll()}
 let loading=false, lastWrite=0;
@@ -1007,7 +1019,7 @@ async function loadAll(){
   if(loading)return;loading=true;
   try{
     if(Date.now()-lastWrite<20000){loading=false;return}
-    const [plan,weekly,summary,goals,report,pmc,profile]=await Promise.all(['plan','weekly','summary','goals','report','pmc','profile'].map(k=>getJSON('coach/'+k+'.json')));if(pmc)S.pmc=pmc;if(profile)S.profile=profile;
+    const [plan,weekly,summary,goals,report,pmc,profile,staff]=await Promise.all(['plan','weekly','summary','goals','report','pmc','profile','staff'].map(k=>getJSON('coach/'+k+'.json')));if(pmc)S.pmc=pmc;if(profile)S.profile=profile;if(staff)S.staff=staff;
     if(plan)S.plan=plan;if(weekly)S.weekly=weekly.rows||[];if(summary)S.summary=summary;if(goals)S.goals=goals;if(report)S.report=report;
     if(Date.now()-lastWrite>20000){
       const [ci,rq]=await Promise.all([listDir('checkins',14),listDir('requests',30)]);
@@ -1042,6 +1054,7 @@ function err(e){showBanner(e&&e.code==='permission_denied'?'You can’t read thi
 function showBanner(t){const b=$('#banner');b.textContent=t;b.hidden=false}
 })();
 </script>
+
 
 </body>
 </html>
