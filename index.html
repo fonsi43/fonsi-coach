@@ -351,6 +351,13 @@ button:active,.wd:active,.dcell:active,.chip:active,.race:active{transform:scale
 .ptr.spin i{animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion: reduce){.sheet .panel,.swipe-card,.view.enter,.toast{transition:none!important;animation:none!important}}
+.daypick{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:8px}
+.dp{background:var(--surface2);border:1.5px solid var(--line);border-radius:14px;padding:8px 4px;display:flex;flex-direction:column;align-items:center;gap:2px;color:var(--ink)}
+.dp-l{font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.dp-n{font-family:var(--display);font-size:22px;font-weight:700;line-height:1.1}
+.dp-s{font-size:10.5px;color:var(--muted)}
+.dp[aria-checked="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.dp[aria-checked="true"] .dp-l,.dp[aria-checked="true"] .dp-s{color:var(--accent-ink);opacity:.85}
 </style>
 </head>
 <body>
@@ -492,6 +499,7 @@ button:active,.wd:active,.dcell:active,.chip:active,.race:active{transform:scale
   <div class="panel" role="dialog" aria-modal="true" aria-labelledby="sheet-h">
     <h3 id="sheet-h">Change workout</h3>
     <div class="small muted" id="sheet-wo"></div>
+    <div class="daypick" id="sheet-days" role="radiogroup" aria-label="Move to which day" hidden></div>
     <label class="small" for="sheet-note" style="font-weight:600">Anything I should know? (optional)</label>
     <textarea id="sheet-note" placeholder="e.g. exam Thursday, can only run 30 min"></textarea>
     <div class="row2"><button class="ghost" id="sheet-cancel" type="button">Cancel</button><button class="primary" id="sheet-ok" type="button">Send</button></div>
@@ -650,28 +658,39 @@ function renderWeek(){
 function tile(parent,k,v,s,tone){const n=el('div','tile');n.append(el('div','k',k));const vv=el('div','v num',v);n.append(vv);if(s){const ss=el('div','s',s);if(tone)ss.style.color='var(--'+tone+')';n.append(ss)}parent.append(n);return n}
 
 /* ---------- requests ---------- */
-const REQLABEL={move:'moved to next day',skip:'skipped',easier:'make easier',note:'note'};
+const REQLABEL={move:'moved',skip:'skipped',easier:'make easier',note:'note'};
 let sheetCtx=null;
-function openSheet(w,date,kind){sheetCtx={w,date,kind};$('#sheet-h').textContent={move:'Move to tomorrow',skip:'Skip this workout',easier:'Make it easier',note:'Note on this workout'}[kind];
+function moveTargets(date){if(!S.plan)return [];return S.plan.days.map(d=>d.date).filter(d=>d>=todayISO&&d!==date)}
+function openSheet(w,date,kind){sheetCtx={w,date,kind};$('#sheet-h').textContent={move:'Move to which day?',skip:'Skip this workout',easier:'Make it easier',note:'Note on this workout'}[kind];
   $('#sheet-ok').textContent={move:'Move it',skip:'Skip it',easier:'Make it easier',note:'Send note'}[kind];
-  $('#sheet-wo').textContent=fmtDay(date)+' · '+w.title;$('#sheet-note').value='';openSheetEl('sheet')}
+  $('#sheet-wo').textContent='Now: '+fmtDay(date)+' · '+w.title;$('#sheet-note').value='';
+  const dp=$('#sheet-days');dp.replaceChildren();dp.hidden=kind!=='move';
+  if(kind==='move'){const ts=moveTargets(date);const def=date<todayISO||date>todayISO?todayISO:(ts[0]||null);sheetCtx.to=ts.includes(def)?def:ts[0];
+    const paint=()=>[...dp.children].forEach(b=>b.setAttribute('aria-checked',String(b.dataset.d===sheetCtx.to)));
+    ts.forEach(d=>{const dt=new Date(d+'T12:00:00');const b=el('button','dp');b.type='button';b.setAttribute('role','radio');b.dataset.d=d;
+      const day=S.plan.days.find(x=>x.date===d);const n=(day&&day.items||[]).filter(x=>x.status!=='skipped').length;
+      b.append(el('span','dp-l',d===todayISO?'Today':DOW[dt.getDay()]),el('span','dp-n',String(dt.getDate())),el('span','dp-s',n?n+' session'+(n>1?'s':''):'rest'));
+      b.addEventListener('click',()=>{sheetCtx.to=d;paint();$('#sheet-ok').textContent='Move to '+(d===todayISO?'today':fmtDay(d).slice(0,3))});dp.append(b)});
+    paint();$('#sheet-ok').textContent=sheetCtx.to?'Move to '+(sheetCtx.to===todayISO?'today':fmtDay(sheetCtx.to).slice(0,3)):'No days left this week';$('#sheet-ok').disabled=!sheetCtx.to}
+  else $('#sheet-ok').disabled=false;
+  openSheetEl('sheet')}
 $('#sheet-cancel').addEventListener('click',()=>closeSheetEl('sheet'));
 $('#sheet').addEventListener('click',e=>{if(e.target.id==='sheet')closeSheetEl('sheet')});
 function addDays(iso0,n){const d=new Date(iso0+'T12:00:00');d.setDate(d.getDate()+n);return iso(d)}
-async function applyChange(w,date,kind,note){
+async function applyChange(w,date,kind,note,toDate){
   const plan=JSON.parse(JSON.stringify(S.plan));const day=plan.days.find(d=>d.date===date);const idx=day?day.items.findIndex(x=>x.id===w.id):-1;
   let to=null;
-  if(idx>=0&&kind==='move'){to=addDays(date,1);const nd=plan.days.find(d=>d.date===to);if(!nd)throw new Error('lastday');
-    const it=day.items.splice(idx,1)[0];it.movedFrom=it.movedFrom||date;nd.items.push(it)}
+  if(idx>=0&&kind==='move'){to=toDate||addDays(date,1);const nd=plan.days.find(d=>d.date===to);if(!nd||to<todayISO)throw new Error('lastday');
+    const it=day.items.splice(idx,1)[0];if(!it.movedFrom)it.movedFrom=date;if(it.movedFrom===to)delete it.movedFrom;if(it.status==='missed')it.status='planned';nd.items.push(it)}
   if(idx>=0&&kind==='skip'){day.items[idx].status='skipped'}
   if(idx>=0&&kind==='easier'){day.items[idx].easier=true}
   if(kind!=='note'){plan.updated=new Date().toISOString();plan.changedBy='app';S.plan=plan;renderAll();await db.doc('coach/plan').set(plan)}
   const doc={workoutId:w.id,date,to,title:w.title,kind,note,status:'open',appliedInApp:kind!=='note',createdAt:new Date().toISOString()};
   await db.collection('requests').add(doc)}
 $('#sheet-ok').addEventListener('click',async()=>{
-  if(!sheetCtx)return; const {w,date,kind}=sheetCtx; const btn=$('#sheet-ok'); btn.disabled=true;
-  try{ if(!db) throw new Error('offline'); await applyChange(w,date,kind,$('#sheet-note').value.trim()); closeSheetEl('sheet'); toast({move:'Moved to tomorrow',skip:'Skipped',easier:'Easier version on its way',note:'Note sent'}[kind]); }
-  catch(e){ $('#sheet-wo').textContent=e&&e.message==='lastday'?'This is the last day of the week. Skip it instead, or add a note and I’ll fit it into next week.':'Not saved: no connection. Try again.'; }
+  if(!sheetCtx)return; const {w,date,kind,to}=sheetCtx; const btn=$('#sheet-ok'); btn.disabled=true;
+  try{ if(!db) throw new Error('offline'); await applyChange(w,date,kind,$('#sheet-note').value.trim(),to); closeSheetEl('sheet'); toast({move:'Moved to '+(to===todayISO?'today':fmtDay(to||date)),skip:'Skipped',easier:'Easier version on its way',note:'Note sent'}[kind]); }
+  catch(e){ $('#sheet-wo').textContent=e&&e.message==='lastday'?'There’s no later day left this week. Skip it instead, or add a note and I’ll fit it into next week.':'Not saved: no connection. Try again.'; }
   btn.disabled=false;
 });
 function renderReqs(){
@@ -841,9 +860,10 @@ function hrOf(w){const t=w.target||'';let m=t.match(/HR (\d{3})\s*[–-]\s*(\d{3
 function sbarNode(w){const sg=segs(w);if(sg.length<2&&!(sg.length===1&&sg[0].t!=='easy'))return null;const tot=sg.reduce((a,b)=>a+b.m,0)||1;
   const wrap=el('div');const bar=el('div','sbar');bar.setAttribute('aria-hidden','true');sg.forEach(x=>{const i=el('i',x.t);i.style.flex=String(Math.max(x.m,2)/tot);bar.append(i)});
   wrap.append(bar);return wrap}
-function actionsNode(w,date){const e=eff(w,date);const rq=reqFor(w.id);
-  if(!((e==='planned'||e==='optional')&&date>=todayISO&&canWrite&&!(rq&&rq.kind!=='note')&&!logOf(date,w.id)&&!LOGUI[w.id]))return null;
-  const last=S.plan&&S.plan.days&&S.plan.days[S.plan.days.length-1].date===date;const a=el('div','actions');[['move','Move to tomorrow'],['skip','Skip'],['easier','Make it easier'],['note','Add note']].filter(([k])=>!(k==='move'&&last)&&!(k==='easier'&&w.easier)).forEach(([k,l])=>{const c=el('button','chip',l);c.type='button';c.addEventListener('click',()=>openSheet(w,date,k));a.append(c)});return a}
+function actionsNode(w,date){const e=eff(w,date);const rq=reqFor(w.id);const past=date<todayISO;
+  const open=(e==='planned'||e==='optional'||(past&&e==='missed'&&w.status!=='skipped'))&&canWrite&&!(rq&&rq.kind!=='note')&&!logOf(date,w.id)&&!LOGUI[w.id];
+  if(!open)return null;
+  const canMv=moveTargets(date).length>0;const a=el('div','actions');[['move',past?'Move to today or later':'Move to another day'],['skip','Skip'],['easier','Make it easier'],['note','Add note']].filter(([k])=>!(k==='move'&&!canMv)&&!(k==='easier'&&(w.easier||past))&&!(k==='note'&&past)).forEach(([k,l])=>{const c=el('button','chip',l);c.type='button';c.addEventListener('click',()=>openSheet(w,date,k));a.append(c)});return a}
 function pvNode(w){const a=w.actual;if(!a)return null;const p=w.planned||{};const box=el('div','pv');
   const head=el('div','pv-h');head.append(el('span','',''),el('span','','Planned'),el('span','','Completed'));box.append(head);
   const row=(lbl,pl,ac,cls)=>{if(ac==null||ac==='')return;const r=el('div','pv-r');r.append(el('span','muted',lbl),el('b','num',pl==null||pl===''?'—':String(pl)),el('b','num '+(cls||''),String(ac)));box.append(r)};
@@ -936,7 +956,7 @@ $('#ds-prev').addEventListener('click',()=>dayShift(-1));$('#ds-next').addEventL
 /* swipe a workout card: right = done, left = move */
 function swipeWrap(card,w,date){const wrap=el('div','swipe');const bg=el('div','swipe-bg');const L=el('span','sw-l','✓  Done');const R=el('span','sw-r','Move  →');bg.append(L,R);wrap.append(bg,card);card.classList.add('swipe-card');
   const e0=eff(w,date);const canDone=canWrite&&date<=todayISO&&e0!=='done'&&!logOf(date,w.id)&&!LOGUI[w.id]&&w.status!=='skipped';
-  const last=S.plan&&S.plan.days[S.plan.days.length-1].date===date;const canMove=!!actionsNode(w,date);
+  const last=moveTargets(date).length===0;const canMove=!!actionsNode(w,date);
   if(last)R.textContent='Skip  →';if(!canDone)L.textContent='';if(!canMove)R.textContent='';
   let x0=0,y0=0,dx=0,dec=false,hz=false;
   card.addEventListener('touchstart',e=>{if(e.target.closest('button,textarea,input'))return x0=null;x0=e.touches[0].clientX;y0=e.touches[0].clientY;dx=0;dec=false;hz=false},{passive:true});
