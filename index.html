@@ -645,7 +645,7 @@ function renderWeek(){
     const h=el('div','dc-h'); h.append(el('b','',DOW[dt.getDay()]), el('span','',d.date===todayISO?'Today':dt.getDate()+' '+dt.toLocaleString('en',{month:'short'}))); cell.append(h);
     if(!d.items||!d.items.length) cell.append(el('div','dc-w muted','Rest'));
     (d.items||[]).forEach(w=>{const e=eff(w,d.date); if(w.status!=='optional'){nAll++; if(e==='done')nDone++}
-      const r=el('div','dc-w c-'+comp(w,d.date)); r.append(el('i',w.status==='optional'&&e!=='done'?'optional':'')); r.append(el('span','',w.title)); const mm=minsOf(w); if(mm) r.append(el('em','',mm+"'")); cell.append(r)});
+      const r=el('div','dc-w c-'+comp(w,d.date)); r.append(el('i',w.status==='optional'&&e!=='done'?'optional':'')); r.append(el('span','',w.title)); const mm=cardMins(w); if(mm) r.append(el('em','',mm+"'")); cell.append(r)});
     const dc=dayComp(d); if(dc) cell.classList.add('dc-'+dc);
     cell.setAttribute('aria-label',fmtDay(d.date)+': '+((d.items||[]).map(w=>w.title).join(', ')||'rest')+'. '+({done:'Done',missed:'Missed',todo:'Coming up',rest:'Rest'}[stt]));
     cell.addEventListener('click',()=>openDay(d.date)); box.append(cell);
@@ -695,12 +695,13 @@ $('#sheet-ok').addEventListener('click',async()=>{
   btn.disabled=false;
 });
 function renderReqs(){
-  const box=$('#reqs'); if(!S.requests.length)return;
-  box.replaceChildren();
-  S.requests.slice().sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'')).slice(0,12).forEach(r=>{
+  const box=$('#reqs'); box.replaceChildren();
+  const open=S.requests.filter(r=>r.status!=='done');
+  if(!open.length){box.append(el('p','empty','No open requests.'));return}
+  open.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'')).slice(0,12).forEach(r=>{
     const n=el('div','req'); const l=el('div');
     l.append(el('div','',fmtDay(r.date)+' · '+r.title)); l.append(el('div','small muted',REQLABEL[r.kind]+(r.note?' · "'+r.note+'"':'')+(r.reply?' → '+r.reply:'')));
-    n.append(l); n.append(el('span','pill '+(r.status==='done'?'done':'req'),r.status==='done'?'On your watch':(r.appliedInApp?'Updating watch…':'Sent to coach'))); box.append(n);
+    n.append(l); n.append(el('span','pill req',r.appliedInApp?'Updating watch…':'Sent to coach')); box.append(n);
   });
 }
 
@@ -865,9 +866,15 @@ function segs(w){const tx=(w.target||'').split(/·/).map(x=>x.trim()).filter(Boo
     if(!m&&t==='easy')return;
     sg.split('+').length>1&&t==='wu'&&/\+/.test(sg)?(()=>{const p=sg.split('+');const a=parseInt((p[0].match(/(\d+)/)||[0,0])[1])||0;const b=parseInt((p[1].match(/(\d+)/)||[0,0])[1])||0;if(a)out.push({t:'wu',m:a});if(b)out.push({t:/stride|sprint/i.test(p[1])?'st':'easy',m:b});})():out.push({t,m});
   });
-  if(!out.length){const mm=(w.title||'').match(/(\d+)\s*['’]/);if(mm)out.push({t:/easy|spin|long/i.test(w.title)?'easy':'q',m:+mm[1]})}
+  if(!out.length){const tm=titleMins(w.title);if(tm)out.push({t:/easy|spin|long/i.test(w.title)?'easy':'q',m:tm})}
   return out}
-function minsOf(w){const mm=(w.title||'').match(/(\d+)\s*['’]/);if(mm)return +mm[1];const s=segs(w).reduce((a,b)=>a+b.m,0);return s||null}
+/* Minutes from a title: the total in trailing parentheses, e.g. "3 × 8' @ 94% FTP (50')" → 50; otherwise the largest N' in the title. */
+function titleMins(t){t=t||'';const tot=t.match(/\(\s*(\d+)\s*['’]\s*\)\s*$/);if(tot)return +tot[1];
+  const all=[...t.matchAll(/(\d+)\s*['’]/g)].map(m=>+m[1]);return all.length?Math.max(...all):null}
+/* Planned minutes: planned.min, then the title, then the summed segments. */
+function minsOf(w){const p=w.planned&&w.planned.min;if(p!=null&&p!=='')return +p;const t=titleMins(w.title);if(t)return t;const s=segs(w).reduce((a,b)=>a+b.m,0);return s||null}
+/* Minutes to show on a day card: what was actually done if known, else planned. */
+function cardMins(w){const a=w.actual&&w.actual.min;return a!=null&&a!==''?Math.round(+a):minsOf(w)}
 function hrOf(w){const t=w.target||'';let m=t.match(/HR (\d{3})\s*[–-]\s*(\d{3})/);if(m)return m[1]+'–'+m[2];m=t.match(/HR (?:alert[s]?:? )?(\d{3})/i);return m?'≤'+m[1]:null}
 function sbarNode(w){const sg=segs(w);if(sg.length<2&&!(sg.length===1&&sg[0].t!=='easy'))return null;const tot=sg.reduce((a,b)=>a+b.m,0)||1;
   const wrap=el('div');const bar=el('div','sbar');bar.setAttribute('aria-hidden','true');sg.forEach(x=>{const i=el('i',x.t);i.style.flex=String(Math.max(x.m,2)/tot);bar.append(i)});
