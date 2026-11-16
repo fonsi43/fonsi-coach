@@ -923,9 +923,13 @@ function segs(w){const tx=(w.target||'').split(/·/).map(x=>x.trim()).filter(Boo
   });
   if(!out.length){const tm=titleMins(w.title);if(tm)out.push({t:/easy|spin|long/i.test(w.title)?'easy':'q',m:tm})}
   return out}
-/* Minutes from a title: the total in trailing parentheses, e.g. "3 × 8' @ 94% FTP (50')" → 50; otherwise the largest N' in the title. */
+/* Minutes from a title: the total in trailing parentheses, e.g. "3 × 8' @ 94% FTP (50')" → 50.
+   Otherwise add up the parts split on "+": "N × M'" counts N×M, any other part its largest M'.
+   "Run 10' WU + 4 × 5' + 10' CD" → 10 + 20 + 10 = 40. */
 function titleMins(t){t=t||'';const tot=t.match(/\(\s*(\d+)\s*['’]\s*\)\s*$/);if(tot)return +tot[1];
-  const all=[...t.matchAll(/(\d+)\s*['’]/g)].map(m=>+m[1]);return all.length?Math.max(...all):null}
+  const sum=t.split('+').reduce((a,p)=>{const r=p.match(/(\d+)\s*[×x]\s*(\d+)\s*['’]/);if(r)return a+r[1]*r[2];
+    const m=[...p.matchAll(/(\d+)\s*['’]/g)].map(x=>+x[1]);return a+(m.length?Math.max(...m):0)},0);
+  return sum||null}
 /* Planned minutes: planned.min, then the title, then the summed segments. */
 function minsOf(w){const p=w.planned&&w.planned.min;if(p!=null&&p!=='')return +p;const t=titleMins(w.title);if(t)return t;const s=segs(w).reduce((a,b)=>a+b.m,0);return s||null}
 /* Minutes to show on a day card: what was actually done if known, else planned. */
