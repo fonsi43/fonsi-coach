@@ -376,6 +376,37 @@ button:active,.wd:active,.dcell:active,.chip:active,.race:active{transform:scale
 .chev{flex:none;width:16px;height:16px;stroke:var(--muted);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 #today-h .cnt{font-size:13px;font-weight:600;color:var(--muted);margin-left:6px;letter-spacing:0;text-transform:none}
 @media (prefers-reduced-motion:no-preference){.mini{animation:viewin .25s ease}}
+
+/* ===== v5: native iPhone look, coach notes, Q&A ===== */
+:root{--body:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;--display:-apple-system,"SF Pro Display",BlinkMacSystemFont,system-ui,sans-serif}
+body{font-family:var(--body);-webkit-font-smoothing:antialiased;letter-spacing:-.01em}
+.brand{font-family:var(--display);font-weight:800;letter-spacing:-.01em;text-transform:none;font-size:24px}
+.greet .hello{font-family:var(--display);font-size:30px;font-weight:800;letter-spacing:-.03em}
+h2{font-family:var(--display);font-size:21px;font-weight:700;letter-spacing:-.02em}
+.hero .ttl{font-family:var(--display);font-size:24px;font-weight:700;letter-spacing:-.03em}
+.hero .stat b,.tile .v,.race .d,.bigring b,.ring b,.dc-sum .v{font-family:var(--display);font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.card,.hero,.wstrip,.tile,.race,.wkprog{border-color:transparent}
+.steps{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px;counter-reset:st}
+.steps li{position:relative;padding:8px 10px 8px 34px;background:var(--surface2);border-radius:10px;font-size:14px;line-height:1.35;counter-increment:st}
+.steps li::before{content:counter(st);position:absolute;left:10px;top:8px;width:16px;height:16px;border-radius:50%;background:var(--k,var(--run));color:#fff;font-size:10.5px;font-weight:700;display:grid;place-items:center}
+.take{display:flex;flex-direction:column;gap:4px;padding:12px 14px;border-radius:14px;background:linear-gradient(135deg,color-mix(in srgb,#7C5CFF 14%,var(--surface)),var(--surface2))}
+.take b{font-size:11.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#7C5CFF}
+.take p{margin:0;font-size:14px;line-height:1.45}
+.weeknote{display:flex;flex-direction:column;gap:8px}
+.weeknote .wn-h{display:flex;justify-content:space-between;align-items:baseline}
+.weeknote .wn-h b{font-size:13px;color:var(--muted);font-weight:600}
+.weeknote .wn-h span{font-size:12px;color:var(--muted)}
+.weeknote p{margin:0;font-size:14.5px;line-height:1.45}
+.weeknote p.lead{font-weight:700;font-size:15.5px}
+.weeknote ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;font-size:14px}
+.ask textarea{min-height:56px}
+.qa{display:flex;flex-direction:column;gap:12px}
+.qa:empty{display:none}
+.qa-item{display:flex;flex-direction:column;gap:6px}
+.qa-item .q{align-self:flex-end;max-width:85%;background:var(--accent);color:var(--accent-ink);padding:8px 12px;border-radius:16px 16px 4px 16px;font-size:14px}
+.qa-item .a{align-self:flex-start;max-width:92%;background:var(--surface2);padding:10px 12px;border-radius:16px 16px 16px 4px;font-size:14px;line-height:1.45}
+.qa-item .a.pending{color:var(--muted);font-style:italic}
+.sync.busy i{animation:spin .9s linear infinite}
 </style>
 </head>
 <body>
@@ -405,6 +436,7 @@ button:active,.wd:active,.dcell:active,.chip:active,.race:active{transform:scale
       <div id="today-list" style="display:flex;flex-direction:column;gap:12px"><p class="empty">Loading today's plan…</p></div>
     </div>
     <div class="card coach" id="coach-card" hidden><div class="av" aria-hidden="true">C</div><div class="tx"><b>Coach's focus this week</b><span id="coach-focus"></span></div></div>
+    <div class="card weeknote" id="midweek-card" hidden><div class="wn-h"><b>Week so far</b><span id="midweek-date"></span></div><div id="midweek-text"></div></div>
     <div class="races" id="races-today"></div>
     <div class="sec" id="checkin-sec">
       <h2>Daily check-in</h2>
@@ -434,6 +466,15 @@ button:active,.wd:active,.dcell:active,.chip:active,.race:active{transform:scale
       <div class="card">
         <div class="small muted" style="margin-bottom:8px">Last 7 days</div>
         <div class="streak" id="streak"></div>
+      </div>
+    </div>
+    <div class="sec" id="ask-sec">
+      <h2>Ask your coach</h2>
+      <div class="card form ask">
+        <textarea id="ask-q" placeholder="e.g. Slept badly, what should I do today?"></textarea>
+        <button class="primary" id="ask-send" type="button">Send to coach</button>
+        <div class="small muted" id="ask-hint">Your coach answers at its next sync.</div>
+        <div class="qa" id="qa-list"></div>
       </div>
     </div>
   </section>
@@ -570,7 +611,7 @@ window.addEventListener('hashchange',()=>show(location.hash.slice(1)));
 show(location.hash.slice(1));
 
 /* ---------- state ---------- */
-const S={profile:null,pmc:null,plan:null,weekly:[],summary:null,goals:null,report:null,staff:null,checkins:{},requests:[]};
+const S={profile:null,pmc:null,plan:null,weekly:[],summary:null,goals:null,report:null,staff:null,analyses:{},midweek:null,checkins:{},requests:[]};
 let db=null, canWrite=true;
 
 /* ---------- workouts ---------- */
@@ -714,7 +755,7 @@ function renderWeek(){
 function tile(parent,k,v,s,tone){const n=el('div','tile');n.append(el('div','k',k));const vv=el('div','v num',v);n.append(vv);if(s){const ss=el('div','s',s);if(tone)ss.style.color='var(--'+tone+')';n.append(ss)}parent.append(n);return n}
 
 /* ---------- requests ---------- */
-const REQLABEL={move:'moved',skip:'skipped',easier:'make easier',note:'note'};
+const REQLABEL={move:'moved',skip:'skipped',easier:'make easier',note:'note',question:'question'};
 let sheetCtx=null;
 function moveTargets(date){if(!S.plan)return [];return S.plan.days.map(d=>d.date).filter(d=>d>=todayISO&&d!==date)}
 function openSheet(w,date,kind){sheetCtx={w,date,kind};$('#sheet-h').textContent={move:'Move to which day?',skip:'Skip this workout',easier:'Make it easier',note:'Note on this workout'}[kind];
@@ -740,7 +781,7 @@ async function applyChange(w,date,kind,note,toDate){
     const it=day.items.splice(idx,1)[0];if(!it.movedFrom)it.movedFrom=date;if(it.movedFrom===to)delete it.movedFrom;if(it.status==='missed')it.status='planned';nd.items.push(it)}
   if(idx>=0&&kind==='skip'){day.items[idx].status='skipped'}
   if(idx>=0&&kind==='easier'){day.items[idx].easier=true}
-  if(kind!=='note'){plan.updated=new Date().toISOString();plan.changedBy='app';S.plan=plan;renderAll();await db.doc('coach/plan').set(plan)}
+  if(kind!=='note'){plan.updated=new Date().toISOString();plan.changedBy='app';S.plan=plan;renderAll();if(db.planChange)await db.planChange({workoutId:w.id,date,kind,to});else await db.doc('coach/plan').set(plan)}
   const doc={workoutId:w.id,date,to,title:w.title,kind,note,status:'open',appliedInApp:kind!=='note',createdAt:new Date().toISOString()};
   await db.collection('requests').add(doc)}
 $('#sheet-ok').addEventListener('click',async()=>{
@@ -751,7 +792,7 @@ $('#sheet-ok').addEventListener('click',async()=>{
 });
 function renderReqs(){
   const box=$('#reqs'); box.replaceChildren();
-  const open=S.requests.filter(r=>r.status!=='done');
+  const open=S.requests.filter(r=>r.status!=='done'&&r.kind!=='question');
   if(!open.length){box.append(el('p','empty','No open requests.'));return}
   open.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'')).slice(0,12).forEach(r=>{
     const n=el('div','req'); const l=el('div');
@@ -962,7 +1003,7 @@ function heroNode(w,date){const k=kindOf(w);const n=el('article','hero '+k.c);
   const lg0=logOf(date,w.id);if(lg0&&lg0.rpe){const s=el('div','stat');s.append(el('b','',String(lg0.rpe)),el('span','','your RPE'));st.append(s)}
   if(st.children.length)n.append(st);
   const sb=sbarNode(w);if(sb)n.append(sb);
-  if(w.target)n.append(el('div','note',w.target));
+  if(w.target){const parts=w.target.split(/\s*·\s*/).filter(Boolean);if(parts.length>1){const ol=el('ol','steps');parts.forEach(x=>ol.append(el('li','',x)));n.append(ol)}else n.append(el('div','note',w.target))}
   const rq=reqFor(w.id);
   if(w.movedFrom&&w.movedFrom!==date)n.append(el('span','pill req','Moved from '+fmtDay(w.movedFrom)+(rq&&rq.kind==='move'?' · updating your watch…':'')));
   else if(w.easier)n.append(el('span','pill req',rq&&rq.kind==='easier'?'Easier version coming to your watch…':'Easier version'));
@@ -970,6 +1011,7 @@ function heroNode(w,date){const k=kindOf(w);const n=el('article','hero '+k.c);
   else if(rq&&rq.kind==='note')n.append(el('span','pill req','Note sent to coach'));
   const pv=pvNode(w);if(pv)n.append(pv);
   if(w.result)n.append(el('div','res',w.result));
+  const an=S.analyses&&S.analyses[w.id];if(an&&an.text){const t=el('div','take');t.append(el('b','','Coach’s take'),el('p','',an.text));n.append(t)}
   const lg=logNode(w,date);if(lg)n.append(lg);
   const ac=actionsNode(w,date);if(ac)n.append(ac);
   return swipeWrap(n,w,date)}
@@ -1069,88 +1111,174 @@ function swipeWrap(card,w,date){const wrap=el('div','swipe');const bg=el('div','
     ind.classList.add('spin');ind.style.transform='translate(-50%,56px)';try{if(window.__refresh)await window.__refresh();else renderAll()}catch(e){}
     setTimeout(()=>{ind.classList.remove('spin');ind.style.transform='';ind.style.opacity='0';toast(syncErr?'Couldn’t update. Showing your saved copy.':'Up to date')},350)})})();
 
-function renderAll(){renderGreet();renderStrip();renderWkProg();renderWkHead();renderToday();renderWeek();renderReqs();renderStreak();renderGoals();loadCheckinForm();drawTrends()}
+function renderAll(){renderCoachNotes();renderGreet();renderStrip();renderWkProg();renderWkHead();renderToday();renderWeek();renderReqs();renderStreak();renderGoals();loadCheckinForm();drawTrends()}
 renderAll();
 
-/* ---------- data: private GitHub repository ---------- */
+
+/* ---------- coach notes: week so far + questions ---------- */
+function renderCoachNotes(){
+  const mw=S.midweek,card=$('#midweek-card');if(card){card.hidden=!(mw&&mw.text);if(mw&&mw.text){
+    $('#midweek-date').textContent=mw.date?fmtDay(mw.date):'';const box=$('#midweek-text');box.replaceChildren();
+    const lines=mw.text.split('\n').map(x=>x.trim()).filter(Boolean);let ul=null;
+    lines.forEach((l,i)=>{if(l.startsWith('- ')){if(!ul){ul=el('ul');box.append(ul)}ul.append(el('li','',l.slice(2)))}else{ul=null;box.append(el('p',i===0?'lead':'',l))}})}}
+  const list=$('#qa-list');if(!list)return;list.replaceChildren();
+  const qs=S.requests.filter(r=>r.kind==='question').sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'')).slice(0,5);
+  qs.forEach(q=>{const it=el('div','qa-item');it.append(el('div','q',q.note||''));
+    if(q.reply)it.append(el('div','a',q.reply));else it.append(el('div','a pending','Waiting for your coach’s next sync…'));list.append(it)});
+  $('#ask-send').disabled=!canWrite}
+$('#ask-send').addEventListener('click',async()=>{const ta=$('#ask-q'),q=ta.value.trim();if(!q||!db)return;const btn=$('#ask-send');btn.disabled=true;
+  try{await db.collection('requests').add({workoutId:'',date:todayISO,to:null,title:'Question',kind:'question',note:q,status:'open',appliedInApp:false,createdAt:new Date().toISOString()});
+    ta.value='';toast('Sent to your coach');renderCoachNotes()}
+  catch(e){toast('Not sent. Try again.')}
+  btn.disabled=false});
+/* ---------- data ----------
+   Two backends, same app:
+   - inside Claude (the "Fonsi Coach" artifact): Claude's live db (onSnapshot).
+   - GitHub Pages: the private data repo. One tiny GraphQL request checks whether anything changed;
+     one more loads everything. Saves go through an outbox kept on the phone and retried until GitHub
+     accepts them; plan changes are re-applied to the latest plan so the coach's edits are never lost. */
 const LS={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+const IN_CLAUDE=!!(window.claude&&window.claude.use);
 let CFG=LS.get('fc_cfg');
 const SHA={};
 const b64e=s=>btoa(unescape(encodeURIComponent(s)));
 const b64d=s=>decodeURIComponent(escape(atob(s.replace(/\n/g,''))));
+const GH='https://api.github.com';
 const GHH=()=>({'Authorization':'Bearer '+CFG.token,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'});
-const URLC=p=>'https://api.github.com/repos/'+CFG.owner+'/'+CFG.repo+'/contents/'+p;
-function api(path){return fetch(URLC(path)+'?t='+Date.now(),{cache:'no-store',headers:GHH()}).then(async r=>{if(r.status===404)return null;if(!r.ok){const e=new Error('http '+r.status);e.status=r.status;throw e}return r.json()})}
+const URLC=p=>GH+'/repos/'+CFG.owner+'/'+CFG.repo+'/contents/'+p;
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const httpErr=s=>{const e=new Error('http '+s);e.status=s;return e};
+function api(path){return fetch(URLC(path)+'?t='+Date.now(),{cache:'no-store',headers:GHH()}).then(async r=>{if(r.status===404)return null;if(!r.ok)throw httpErr(r.status);return r.json()})}
 async function getJSON(path){const j=await api(path);if(!j)return null;SHA[path]=j.sha;return JSON.parse(b64d(j.content))}
-async function putJSON(path,obj,msg){
-  const body={message:msg||('app: '+path),content:b64e(JSON.stringify(obj,null,1))};
-  if(SHA[path])body.sha=SHA[path];
-  const go=()=>fetch(URLC(path),{method:'PUT',headers:Object.assign({'Content-Type':'application/json'},GHH()),body:JSON.stringify(body)});
-  let r=await go();
-  if(r.status===409||r.status===422){const cur=await api(path);if(cur){body.sha=cur.sha;r=await go()}}
-  if(!r.ok){const e=new Error('http '+r.status);e.status=r.status;throw e}
-  const j=await r.json();SHA[path]=j.content.sha;return j}
 async function listDir(dir,n){const l=await api(dir);if(!Array.isArray(l))return [];return l.filter(f=>f.name.endsWith('.json')).sort((x,y)=>y.name.localeCompare(x.name)).slice(0,n)}
-function cacheObj(){return {staff:S.staff,profile:S.profile,pmc:S.pmc,plan:S.plan,weekly:S.weekly,summary:S.summary,goals:S.goals,report:S.report,checkins:S.checkins,requests:S.requests}}
-function saveCache(){LS.set('fc_cache',cacheObj())}
-const cached=LS.get('fc_cache');
+async function gql(query){const r=await fetch(GH+'/graphql',{method:'POST',cache:'no-store',headers:Object.assign({'Content-Type':'application/json'},GHH()),body:JSON.stringify({query,variables:{o:CFG.owner,r:CFG.repo}})});
+  if(!r.ok)throw httpErr(r.status);const j=await r.json();if(!j.data||!j.data.repository)throw new Error((j.errors&&j.errors[0]&&j.errors[0].message)||'graphql');return j.data.repository}
+const TREE='...on Tree{entries{name object{...on Blob{oid text}}}}';
+const Q_HEAD='query($o:String!,$r:String!){repository(owner:$o,name:$r){ref(qualifiedName:"refs/heads/main"){target{oid}}}}';
+const Q_ALL='query($o:String!,$r:String!){repository(owner:$o,name:$r){ref(qualifiedName:"refs/heads/main"){target{oid}} coach:object(expression:"main:coach"){'+TREE+'} checkins:object(expression:"main:checkins"){'+TREE+'} requests:object(expression:"main:requests"){'+TREE+'}}}';
+function cacheObj(){return {staff:S.staff,profile:S.profile,pmc:S.pmc,plan:S.plan,weekly:S.weekly,summary:S.summary,goals:S.goals,report:S.report,analyses:S.analyses,midweek:S.midweek,checkins:S.checkins,requests:S.requests}}
+function saveCache(){if(!IN_CLAUDE)LS.set('fc_cache',cacheObj())}
+const cached=IN_CLAUDE?null:LS.get('fc_cache');
 if(cached){Object.assign(S,cached);renderAll()}
-let loading=false, lastWrite=0, syncErr=false;
+let loading=false, syncErr=false, headOid=LS.get('fc_head');
+function applyCoach(c){if(c.plan)S.plan=c.plan;if(c.weekly)S.weekly=c.weekly.rows||[];['summary','goals','report','pmc','profile','staff','analyses','midweek'].forEach(k=>{if(c[k])S[k]=c[k]})}
+
+/* ---------- outbox: saves survive bad signal and conflicts ---------- */
+let OUT=IN_CLAUDE?[]:(LS.get('fc_outbox')||[]);
+function saveOut(){LS.set('fc_outbox',OUT)}
+function applyOp(plan0,op){const plan=JSON.parse(JSON.stringify(plan0));const day=(plan.days||[]).find(d=>d.date===op.date);const idx=day?day.items.findIndex(x=>x.id===op.workoutId):-1;
+  if(idx>=0&&op.kind==='move'){const nd=plan.days.find(d=>d.date===op.to);if(nd){const it=day.items.splice(idx,1)[0];if(!it.movedFrom)it.movedFrom=op.date;if(it.movedFrom===op.to)delete it.movedFrom;if(it.status==='missed')it.status='planned';nd.items.push(it)}}
+  if(idx>=0&&op.kind==='skip')day.items[idx].status='skipped';
+  if(idx>=0&&op.kind==='easier')day.items[idx].easier=true;
+  return plan}
+/* show not-yet-saved changes on top of freshly loaded data */
+function overlayOutbox(){OUT.forEach(j=>{
+  if(j.type==='plan'&&S.plan)S.plan=applyOp(S.plan,j.op);
+  else if(j.path&&j.path.startsWith('checkins/'))S.checkins[j.obj.date||j.path.slice(9,19)]=j.obj;
+  else if(j.path&&j.path.startsWith('requests/')){const id=j.path.slice(9);if(!S.requests.some(r=>r.id===id))S.requests.unshift(Object.assign({id},j.obj))}})}
+function enqueue(job){OUT.push(Object.assign({at:Date.now()},job));saveOut();paintSync();flush()}
+async function putRaw(path,obj,msg){const body={message:msg||('app: '+path),content:b64e(JSON.stringify(obj,null,1))};if(SHA[path])body.sha=SHA[path];
+  return fetch(URLC(path),{method:'PUT',headers:Object.assign({'Content-Type':'application/json'},GHH()),body:JSON.stringify(body)})}
+async function runJob(job){const path=job.type==='plan'?'coach/plan.json':job.path;
+  for(let attempt=0;attempt<5;attempt++){
+    let obj=job.obj;
+    if(job.type==='plan'){const cur=await getJSON(path);obj=applyOp(cur||S.plan,job.op);obj.updated=new Date().toISOString();obj.changedBy='app'}
+    else if(attempt>0||!SHA[path]){try{await api(path).then(j=>{if(j)SHA[path]=j.sha})}catch(e){}}
+    const r=await putRaw(path,obj,job.msg);
+    if(r.ok){const j=await r.json();SHA[path]=j.content.sha;if(job.type==='plan'){S.plan=obj;}return}
+    if(r.status===409||r.status===422){await sleep(500*(attempt+1));continue}
+    throw httpErr(r.status)}
+  throw httpErr(409)}
+let flushing=false, flushTimer=null;
+async function flush(){if(IN_CLAUDE||flushing||!OUT.length||!CFG||!CFG.token||!navigator.onLine)return;flushing=true;paintSync();
+  try{while(OUT.length){await runJob(OUT[0]);OUT.shift();saveOut();headOid=null}syncErr=false;saveCache();renderAll()}
+  catch(e){if(e.status===401||e.status===403)showBanner('Your access key was refused. Tap the gear and paste a new one.');clearTimeout(flushTimer);flushTimer=setTimeout(flush,20000)}
+  flushing=false;paintSync()}
+
 /* ---------- sync status ("Updated 5 min ago") ---------- */
 function ago(t){const s=(Date.now()-t)/1000;if(s<60)return 'just now';if(s<3600)return Math.floor(s/60)+' min ago';if(s<86400)return Math.floor(s/3600)+' h ago';return 'on '+fmtDay(iso(new Date(t)))}
 function paintSync(){const b=$('#sync');if(!b)return;const t=LS.get('fc_synced');let cls='',txt;
-  if(!CFG||!CFG.token){cls='err';txt='Not connected · tap to set up'}
+  if(IN_CLAUDE){txt=db?'Live':'Connecting…';cls=db?'':'busy'}
+  else if(!CFG||!CFG.token){cls='err';txt='Not connected · tap to set up'}
+  else if(OUT.length&&!navigator.onLine){cls='stale';txt='Saved on phone · will sync'}
+  else if(OUT.length){cls='busy';txt='Saving…'}
   else if(loading){cls='busy';txt='Updating…'}
   else if(!navigator.onLine){cls='stale';txt='Offline'+(t?' · updated '+ago(t):'')}
   else if(syncErr){cls='err';txt='Couldn’t update'+(t?' · last '+ago(t):'')+' · tap to retry'}
-  else if(t){cls=Date.now()-t>6*3600e3?'stale':'';txt='Updated '+ago(t)}
+  else if(t){cls=Date.now()-t>6*3600e3?'stale':'';txt='Up to date · '+ago(t)}
   else txt='Not updated yet';
   b.className='sync '+cls;b.lastElementChild.textContent=txt}
-$('#sync').addEventListener('click',()=>{if(!CFG||!CFG.token)openSetup();else window.__refresh()});
-/* refresh quietly when the data is older than maxAge (ms) */
-function autoLoad(maxAge){if(syncDate())renderAll();paintSync();if(!CFG||!CFG.token||!navigator.onLine)return;if(Date.now()-(LS.get('fc_synced')||0)>maxAge)loadAll()}
-async function loadAll(){
+$('#sync').addEventListener('click',()=>{if(IN_CLAUDE)return;if(!CFG||!CFG.token)openSetup();else window.__refresh()});
+/* check for changes when the data is older than maxAge (ms); cheap when nothing changed */
+function autoLoad(maxAge){if(syncDate())renderAll();paintSync();if(IN_CLAUDE||!CFG||!CFG.token||!navigator.onLine)return;if(Date.now()-(LS.get('fc_synced')||0)>maxAge)loadAll()}
+async function restLoad(){
+  const [plan,weekly,summary,goals,report,pmc,profile,staff,analyses,midweek]=await Promise.all(['plan','weekly','summary','goals','report','pmc','profile','staff','analyses','midweek'].map(k=>getJSON('coach/'+k+'.json')));
+  applyCoach({plan,weekly,summary,goals,report,pmc,profile,staff,analyses,midweek});
+  const [ci,rq]=await Promise.all([listDir('checkins',14),listDir('requests',40)]);
+  const cis=await Promise.all(ci.map(f=>getJSON(f.path)));const nc={};cis.forEach((v,i)=>{if(v)nc[v.date||ci[i].name.slice(0,10)]=v});S.checkins=nc;
+  const rqs=await Promise.all(rq.map(f=>getJSON(f.path)));S.requests=rqs.map((v,i)=>v&&Object.assign({id:rq[i].name},v)).filter(Boolean)}
+async function loadAll(force){
+  if(IN_CLAUDE)return;
   if(!CFG||!CFG.token){paintSync();setTimeout(openSetup,50);return}
   if(loading)return;loading=true;paintSync();
   try{
-    if(Date.now()-lastWrite<20000){loading=false;paintSync();return}
+    let repo=null;
+    try{
+      if(!force&&headOid&&!OUT.length){const h=await gql(Q_HEAD);const oid=h.ref&&h.ref.target&&h.ref.target.oid;
+        if(oid&&oid===headOid){LS.set('fc_synced',Date.now());syncErr=false;loading=false;paintSync();return}}
+      repo=await gql(Q_ALL);
+    }catch(e){if(e.status===401||e.status===403)throw e;repo=null}
     const before=JSON.stringify(cacheObj());
-    const [plan,weekly,summary,goals,report,pmc,profile,staff]=await Promise.all(['plan','weekly','summary','goals','report','pmc','profile','staff'].map(k=>getJSON('coach/'+k+'.json')));if(pmc)S.pmc=pmc;if(profile)S.profile=profile;if(staff)S.staff=staff;
-    if(plan)S.plan=plan;if(weekly)S.weekly=weekly.rows||[];if(summary)S.summary=summary;if(goals)S.goals=goals;if(report)S.report=report;
-    if(Date.now()-lastWrite>20000){
-      const [ci,rq]=await Promise.all([listDir('checkins',14),listDir('requests',30)]);
-      const cis=await Promise.all(ci.map(f=>getJSON(f.path)));const nc={};cis.forEach((v,i)=>{if(v)nc[v.date||ci[i].name.slice(0,10)]=v});S.checkins=nc;
-      const rqs=await Promise.all(rq.map(f=>getJSON(f.path)));S.requests=rqs.map((v,i)=>v&&Object.assign({id:rq[i].name},v)).filter(Boolean);
-    }
+    if(repo){
+      const files=(t,dir)=>((t&&t.entries)||[]).filter(e=>e.name.endsWith('.json')&&e.object&&e.object.text!=null).map(e=>{SHA[dir+'/'+e.name]=e.object.oid;let v=null;try{v=JSON.parse(e.object.text)}catch(x){}return {name:e.name,v}}).filter(x=>x.v).sort((a,b)=>b.name.localeCompare(a.name));
+      const c={};files(repo.coach,'coach').forEach(f=>c[f.name.replace(/\.json$/,'')]=f.v);applyCoach(c);
+      const nc={};files(repo.checkins,'checkins').slice(0,14).forEach(f=>nc[f.v.date||f.name.slice(0,10)]=f.v);S.checkins=nc;
+      S.requests=files(repo.requests,'requests').slice(0,40).map(f=>Object.assign({id:f.name},f.v));
+      headOid=repo.ref&&repo.ref.target&&repo.ref.target.oid;LS.set('fc_head',headOid);
+    }else{await restLoad();headOid=null}
+    overlayOutbox();
     saveCache();LS.set('fc_synced',Date.now());syncErr=false;$('#banner').hidden=true;
     /* only redraw when something changed, so a background refresh never resets what you are looking at */
     if(syncDate()||JSON.stringify(cacheObj())!==before)renderAll();
   }catch(e){syncErr=true;if(e.status===401||e.status===403)showBanner('Your access key was refused. Tap the gear and paste a new one.')}
   loading=false;paintSync()}
-db={
-  doc:p=>({set:async o=>{lastWrite=Date.now();await putJSON(p+'.json',o,'check-in '+(o.date||''));saveCache()}}),
-  collection:c=>({add:async o=>{lastWrite=Date.now();const id=new Date().toISOString().replace(/[:.]/g,'-')+'-'+Math.random().toString(36).slice(2,6);await putJSON(c+'/'+id+'.json',o,'request: '+(o.kind||''));if(c==='requests'){S.requests.unshift(Object.assign({id:id+'.json'},o));saveCache();renderAll()}}})
+if(!IN_CLAUDE)db={
+  doc:p=>({set:async o=>{enqueue({type:'put',path:p+'.json',obj:o,msg:(p.startsWith('checkins/')?'check-in ':'app: ')+(o.date||'')});saveCache()}}),
+  collection:c=>({add:async o=>{const id=new Date().toISOString().replace(/[:.]/g,'-')+'-'+Math.random().toString(36).slice(2,6)+'.json';
+    enqueue({type:'put',path:c+'/'+id,obj:o,msg:'request: '+(o.kind||'')});if(c==='requests'){S.requests.unshift(Object.assign({id},o));saveCache();renderAll()}}}),
+  planChange:async op=>{enqueue({type:'plan',op,msg:'app: '+op.kind+' '+op.workoutId})}
 };
-function openSetup(){const c=CFG||{};$('#cfg-owner').value=c.owner||'';$('#cfg-repo').value=c.repo||'fonsi-coach-data';$('#cfg-token').value=c.token?'••••••••':'';$('#cfg-status').textContent='';openSheetEl('setup')}
+function openSetup(){if(IN_CLAUDE)return;const c=CFG||{};$('#cfg-owner').value=c.owner||'';$('#cfg-repo').value=c.repo||'fonsi-coach-data';$('#cfg-token').value=c.token?'••••••••':'';$('#cfg-status').textContent='';openSheetEl('setup')}
 $('#gear').addEventListener('click',openSetup);
-window.__refresh=()=>{lastWrite=0;return loadAll()};
+window.__refresh=()=>{flush();return loadAll(true)};
 $('#cfg-cancel').addEventListener('click',()=>closeSheetEl('setup'));
-$('#cfg-refresh').addEventListener('click',()=>{closeSheetEl('setup');lastWrite=0;loadAll()});
+$('#cfg-refresh').addEventListener('click',()=>{closeSheetEl('setup');window.__refresh()});
 $('#cfg-save').addEventListener('click',async()=>{
   const st=$('#cfg-status');const tok=$('#cfg-token').value.trim();
   const n={owner:$('#cfg-owner').value.trim(),repo:$('#cfg-repo').value.trim()||'fonsi-coach-data',token:tok.startsWith('••')&&CFG?CFG.token:tok};
   if(!n.owner||!n.token){st.className='status err';st.textContent='Fill in your username and access key.';return}
   st.className='status';st.textContent='Checking…';const old=CFG;CFG=n;
-  try{const r=await fetch('https://api.github.com/repos/'+n.owner+'/'+n.repo,{headers:{'Authorization':'Bearer '+n.token,'Accept':'application/vnd.github+json'}});
-    if(!r.ok)throw new Error(r.status);LS.set('fc_cfg',n);st.className='status ok';st.textContent='Connected.';setTimeout(()=>closeSheetEl('setup'),600);loadAll()}
+  try{const r=await fetch(GH+'/repos/'+n.owner+'/'+n.repo,{headers:{'Authorization':'Bearer '+n.token,'Accept':'application/vnd.github+json'}});
+    if(!r.ok)throw new Error(r.status);LS.set('fc_cfg',n);st.className='status ok';st.textContent='Connected.';setTimeout(()=>closeSheetEl('setup'),600);headOid=null;loadAll(true);flush()}
   catch(e){CFG=old;st.className='status err';st.textContent=String(e.message)==='404'?'Repository not found. Check the name and that the key covers it.':'Key refused. Make sure it has Contents read and write on that repository.'}
 });
-/* live updates: on reopening the app (if older than 30 s), every 5 min while open, and when the connection comes back */
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')autoLoad(30e3)});
-setInterval(()=>{if(document.visibilityState==='visible')autoLoad(5*60e3)},60e3);
-window.addEventListener('online',()=>autoLoad(0));
+/* live updates: right away when you come back to the app, every 45 s while it's open, and when the connection returns */
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){flush();autoLoad(0)}});
+setInterval(()=>{if(document.visibilityState==='visible'){flush();autoLoad(40e3)}},45e3);
+window.addEventListener('online',()=>{flush();autoLoad(0)});
 window.addEventListener('offline',paintSync);
-loadAll();
+if(IN_CLAUDE){(async()=>{
+  db=await claude.use('db');
+  if(!db){showBanner('Sign in to Claude to load your plan and save check-ins.');canWrite=false;paintSync();renderAll();return}
+  try{const u=await claude.use('user');const w=u?await u.can('data.write'):null;if(w===false){canWrite=false;$('#ci-save').disabled=true;$('#ci-status').textContent='View only.'}}catch(e){}
+  const on=(path,key,map)=>db.doc(path).onSnapshot(s=>{S[key]=s.exists?(map?map(s.data()):s.data()):S[key];renderAll()},err);
+  on('coach/plan','plan');on('coach/summary','summary');on('coach/goals','goals');on('coach/report','report');
+  on('coach/weekly','weekly',d=>d.rows||[]);on('coach/pmc','pmc');on('coach/profile','profile');on('coach/staff','staff');
+  on('coach/analyses','analyses');on('coach/midweek','midweek');
+  db.collection('checkins').orderBy('date','desc').limit(14).onSnapshot(q=>{S.checkins={};q.docs.forEach(d=>{const v=d.data();S.checkins[v.date||d.id]=v});renderAll()},err);
+  db.collection('requests').orderBy('createdAt','desc').limit(40).onSnapshot(q=>{S.requests=q.docs.map(d=>Object.assign({id:d.id},d.data()));renderAll()},err);
+  paintSync()})()}
+else{overlayOutbox();loadAll();flush()}
 if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{})}
 function err(e){showBanner(e&&e.code==='permission_denied'?'You can’t read this data.':'Connection problem. Data may be out of date.')}
 function showBanner(t){const b=$('#banner');b.textContent=t;b.hidden=false}
