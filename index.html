@@ -407,6 +407,10 @@ h2{font-family:var(--display);font-size:21px;font-weight:700;letter-spacing:-.02
 .qa-item .a{align-self:flex-start;max-width:92%;background:var(--surface2);padding:10px 12px;border-radius:16px 16px 16px 4px;font-size:14px;line-height:1.45}
 .qa-item .a.pending{color:var(--muted);font-style:italic}
 .sync.busy i{animation:spin .9s linear infinite}
+.pill.cp-extra{background:color-mix(in srgb,#7C5CFF 16%,var(--surface));color:#7C5CFF}
+.dc-w.c-extra i{background:#7C5CFF}
+.wd.wc-extra .n{background:#7C5CFF;color:#fff}
+.dcell.dc-extra{border-top-color:#7C5CFF}
 </style>
 </head>
 <body>
@@ -618,6 +622,8 @@ let db=null, canWrite=true;
 const SPORT={run:['Run',''],bike:['Bike','bike'],strength:['Gym','gym'],test:['Test','test'],swim:['Swim','bike']};
 const PLANLBL={partial:'Partly done',swapped:'Swapped'};
 const EFFLBL={done:'Done',missed:'Missed',planned:'Coming up',optional:'Optional',skipped:'Skipped'};
+/* optional or unplanned (done on the watch but not in the plan): never counted as planned or missed */
+const isOpt=w=>w.status==='optional'||!!w.unplanned;
 function reqFor(id){return S.requests.find(r=>r.workoutId===id && r.status!=='done')}
 function logOf(date,id){const c=S.checkins[date];return c&&c.workouts&&c.workouts[id]||null}
 function eff(w,date){const lg=logOf(date,w.id);
@@ -634,21 +640,21 @@ async function saveLog(date,wid,patch){
 function rpeScale(onPick,current){const sc=el('div','scale ten');for(let i=1;i<=10;i++){const bt=el('button','',String(i));bt.type='button';bt.setAttribute('aria-label','RPE '+i);bt.setAttribute('aria-pressed',String(current===i));bt.addEventListener('click',()=>onPick(i));sc.append(bt)}
   const wrap=el('div');wrap.append(sc);const ends=el('div','ends');ends.append(el('span','','1 very easy'),el('span','','10 all out'));wrap.append(ends);return wrap}
 const FITSEL={};const FITLBL={plan:'Done as planned',short:'Done, cut short',over:'Done, longer/harder'};
-const COMPLBL={green:'As planned',yellow:'Close to plan',orange:'Off plan',red:'Missed',grey:'Coming up'};
-function comp(w,date){const e=eff(w,date);if(e==='missed')return 'red';if(e!=='done')return 'grey';const lg=logOf(date,w.id);
+const COMPLBL={extra:'Unplanned',green:'As planned',yellow:'Close to plan',orange:'Off plan',red:'Missed',grey:'Coming up'};
+function comp(w,date){if(w.unplanned)return 'extra';const e=eff(w,date);if(e==='missed')return 'red';if(e!=='done')return 'grey';const lg=logOf(date,w.id);
   if(w.compliance)return w.compliance;
   if(lg&&lg.fit)return lg.fit==='short'?'yellow':lg.fit==='over'?'orange':'green';
   if(w.compliance)return w.compliance; if(w.status==='partial')return 'orange'; if(w.status==='swapped')return 'yellow'; return 'green'}
-function dayComp(d){const its=(d.items||[]).filter(w=>w.status!=='optional'||eff(w,d.date)==='done');if(!its.length)return '';
-  const c=its.map(w=>comp(w,d.date));for(const k of ['red','orange','yellow'])if(c.includes(k))return k;if(c.every(x=>x==='green'))return 'green';return 'grey'}
+function dayComp(d){const its=(d.items||[]).filter(w=>!isOpt(w)||eff(w,d.date)==='done');if(!its.length)return '';
+  const c=its.map(w=>comp(w,d.date)).filter(x=>x!=='extra');if(!c.length)return 'extra';for(const k of ['red','orange','yellow'])if(c.includes(k))return k;if(c.every(x=>x==='green'))return 'green';return 'grey'}
 function fmtHM(m){m=Math.round(m||0);return Math.floor(m/60)+':'+String(m%60).padStart(2,'0')}
 function logNode(w,date){
   const lg=logOf(date,w.id), e=eff(w,date), box=el('div','log');
   if(date>todayISO||!canWrite) return null;
   if(LOGUI[w.id]==='rpe'||(e==='done'&&!lg&&w.status!=='swapped')){
     const fit=FITSEL[w.id]||'plan';
-    if(!w.compliance){box.append(el('div','lbl','Compared with the plan?'));}
-    const sg=el('div','seg fitseg');if(w.compliance)sg.hidden=true;[['plan','As planned'],['short','Cut short / easier'],['over','Longer / harder']].forEach(([k,l])=>{const b=el('button','',l);b.type='button';b.setAttribute('aria-pressed',String(fit===k));b.addEventListener('click',()=>{FITSEL[w.id]=k;renderAll()});sg.append(b)});box.append(sg);
+    if(!w.compliance&&!w.unplanned){box.append(el('div','lbl','Compared with the plan?'));}
+    const sg=el('div','seg fitseg');if(w.compliance||w.unplanned)sg.hidden=true;[['plan','As planned'],['short','Cut short / easier'],['over','Longer / harder']].forEach(([k,l])=>{const b=el('button','',l);b.type='button';b.setAttribute('aria-pressed',String(fit===k));b.addEventListener('click',()=>{FITSEL[w.id]=k;renderAll()});sg.append(b)});box.append(sg);
     box.append(el('div','lbl','How hard was it? (RPE)'));
     box.append(rpeScale(n=>saveLog(date,w.id,{done:true,fit,rpe:n}),lg&&lg.rpe));
     const sk=el('button','linkbtn','Save without rating');sk.type='button';sk.addEventListener('click',()=>saveLog(date,w.id,{done:true,fit}));box.append(sk);
@@ -682,7 +688,7 @@ function woNode(w,date,withActions){
   n.append(b); return n;
 }
 /* A workout is "settled" once it is logged (done and rated, or not done) and needs nothing more from you. */
-function settled(w,date){if(LOGUI[w.id])return false;const e=eff(w,date),lg=logOf(date,w.id);
+function settled(w,date){if(LOGUI[w.id])return false;if(w.unplanned)return true;const e=eff(w,date),lg=logOf(date,w.id);
   if(e==='done')return !!lg||w.status==='swapped';
   if(e==='missed')return !!(lg&&lg.done===false)||w.status==='skipped';
   return false}
@@ -708,7 +714,7 @@ function renderToday(){
   const d=(S.plan.days||[]).find(x=>x.date===todayISO);
   if(!d||!d.items||!d.items.length){const c=el('div','card');c.append(el('p','empty','Rest day. Walk, stretch, sleep well.'));box.append(c);
     const un=upNextNode();if(un)box.append(un);return}
-  const req=d.items.filter(w=>w.status!=='optional'||eff(w,d.date)==='done');const nDone=req.filter(w=>settled(w,d.date)).length;
+  const req=d.items.filter(w=>!w.unplanned&&(!isOpt(w)||eff(w,d.date)==='done'));const nDone=req.filter(w=>settled(w,d.date)).length;
   if(req.length)h.append(el('span','cnt',nDone===req.length?'· all done':'· '+nDone+' of '+req.length+' done'));
   /* open sessions first, finished ones below as one-line summaries */
   const open=d.items.filter(w=>!settled(w,d.date)),done=d.items.filter(w=>settled(w,d.date));
@@ -717,9 +723,9 @@ function renderToday(){
     if(!EXPANDED.has(key)){box.append(miniNode(w,d.date));return}
     const hn=heroNode(w,d.date);const less=el('button','linkbtn','Show less');less.type='button';less.style.alignSelf='flex-start';
     less.addEventListener('click',()=>{EXPANDED.delete(key);renderToday()});(hn.querySelector('article')||hn).append(less);box.append(hn)});
-  if(!open.some(w=>w.status!=='optional')){const un=upNextNode();if(un)box.append(un)}
+  if(!open.some(w=>!isOpt(w))){const un=upNextNode();if(un)box.append(un)}
 }
-function dayState(d){const its=(d.items||[]).filter(w=>w.status!=='optional');if(!its.length)return (d.items||[]).length?'todo':'rest';
+function dayState(d){const its=(d.items||[]).filter(w=>!isOpt(w));if(!its.length)return (d.items||[]).length?'todo':'rest';
   const es=its.map(w=>eff(w,d.date));if(es.includes('missed'))return 'missed';if(es.every(x=>x==='done'))return 'done';return 'todo'}
 let openDayDate=null;
 function openDay(date){openDayDate=date;renderDaySheet();openSheetEl('daysheet')}
@@ -740,8 +746,8 @@ function renderWeek(){
     const dt=new Date(d.date+'T12:00:00');
     const h=el('div','dc-h'); h.append(el('b','',DOW[dt.getDay()]), el('span','',d.date===todayISO?'Today':dt.getDate()+' '+dt.toLocaleString('en',{month:'short'}))); cell.append(h);
     if(!d.items||!d.items.length) cell.append(el('div','dc-w muted','Rest'));
-    (d.items||[]).forEach(w=>{const e=eff(w,d.date); if(w.status!=='optional'){nAll++; if(e==='done')nDone++}
-      const r=el('div','dc-w c-'+comp(w,d.date)); r.append(el('i',w.status==='optional'&&e!=='done'?'optional':'')); r.append(el('span','',w.title)); const mm=cardMins(w); if(mm) r.append(el('em','',mm+"'")); cell.append(r)});
+    (d.items||[]).forEach(w=>{const e=eff(w,d.date); if(!isOpt(w)){nAll++; if(e==='done')nDone++}
+      const r=el('div','dc-w c-'+comp(w,d.date)); r.append(el('i',isOpt(w)&&e!=='done'?'optional':'')); r.append(el('span','',w.title)); const mm=cardMins(w); if(mm) r.append(el('em','',mm+"'")); cell.append(r)});
     const dc=dayComp(d); if(dc) cell.classList.add('dc-'+dc);
     cell.setAttribute('aria-label',fmtDay(d.date)+': '+((d.items||[]).map(w=>w.title).join(', ')||'rest')+'. '+({done:'Done',missed:'Missed',todo:'Coming up',rest:'Rest'}[stt]));
     cell.addEventListener('click',()=>openDay(d.date)); box.append(cell);
@@ -943,7 +949,7 @@ function renderStaff(){const box=$('#staff');const st=S.staff;if(!box||!st)retur
     if(!(c.issues||[]).length)ul.append(el('li','muted','No issues.'));ul.style.marginBottom='6px';box.append(ul)})}
 
 /* ---------- v4 helpers ---------- */
-function kindOf(w){const t=(w.title||'')+' ';
+function kindOf(w){if(w.unplanned)return {l:'Extra · '+((SPORT[w.sport]||['Session'])[0]),c:w.sport==='bike'?'k-bike':w.sport==='strength'?'k-gym':'k-run'};const t=(w.title||'')+' ';
   if(w.sport==='strength')return {c:'k-gym',l:'Strength'};
   if(w.sport==='test'||/test|ramp/i.test(t))return {c:'k-test',l:'Test'};
   if(w.sport==='bike')return {c:'k-bike',l:/spin|easy|z2|recovery/i.test(t)?'Easy ride':'Bike session'};
@@ -1032,7 +1038,7 @@ function renderGreet(){const h=today.getHours();$('#g-hello').textContent=(h<12?
     c.append(el('span','d',String(daysTo(d))),el('span','u','days to go'),el('span','nm',nm),el('span','tg',tg));r.append(c)})}
 /* Week totals: sessions and minutes done vs planned, plus what is still to do (today and later). */
 function weekStats(){const r={nD:0,nA:0,mP:0,mD:0,left:[],mL:0};if(!S.plan)return r;
-  (S.plan.days||[]).forEach(d=>(d.items||[]).forEach(w=>{const e=eff(w,d.date),m=minsOf(w)||0,opt=w.status==='optional';
+  (S.plan.days||[]).forEach(d=>(d.items||[]).forEach(w=>{const e=eff(w,d.date),m=minsOf(w)||0,opt=isOpt(w);
     if(!opt){r.nA++;r.mP+=m}
     if(e==='done'){if(!opt)r.nD++;const a=w.actual&&+w.actual.min;const lg=logOf(d.date,w.id);r.mD+=a||m*(lg&&lg.fit==='short'?0.7:lg&&lg.fit==='over'?1.15:1)}
     else if(e==='planned'&&!opt&&!LOGUI[w.id]){r.left.push({w,date:d.date});r.mL+=m}}));
